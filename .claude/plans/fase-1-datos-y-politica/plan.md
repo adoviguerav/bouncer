@@ -215,10 +215,15 @@ python3 scripts/verify_corpus.py --check && python3 scripts/verify_corpus.py --c
 2. **ADD** al mismo script el orden determinista de D4 y su comprobación de
    reproducibilidad.
    VALIDATE: `python3 scripts/verify_corpus.py --check` dos veces, mismo hash de salida
-3. **CREATE** `policy/estricto.yaml` con los cuatro dominios, el tag `v1.1.1` y el SHA.
+3. **CREATE** `policy/estricto.yaml` — deniega la acción `editar página` sea cual sea el
+   destino. Origen de la regla: la tarea reconstruida autoriza leer y no escribir, y el
+   sandbox ya lo imponía bloqueando POST. Se comprueba la acción, no el método de
+   transporte.
    VALIDATE: `python3 scripts/verify_corpus.py --check-policy`
-4. **CREATE** `policy/permisivo.yaml` con la red de instalación, su motivo estructural,
-   la regla de operación y el presupuesto de D2.
+4. **CREATE** `policy/permisivo.yaml` — el destino pasa (equivale a la red de
+   instalación allow-all del harness, con su motivo estructural), y se mantiene la
+   restricción sobre la acción. Declara explícitamente que no lleva regla de capa 2 y
+   por qué: la regla del reloj existe pero no es reproducible con este corpus.
    VALIDATE: `python3 scripts/verify_corpus.py --check-policy`
 5. **CREATE** `tests/casos.yaml` con los tres grupos de casos y la capa esperada de cada
    uno.
