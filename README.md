@@ -6,9 +6,11 @@ Un portero que comprueba llamadas a herramientas antes de ejecutarlas. Proyecto 
 
 ## La tesis
 
-El control que hoy se despliega sobre agentes en este dominio es perimetral o retrospectivo. ExploitGym, el benchmark en el centro del incidente de OpenAI/Hugging Face, aísla al agente en contenedores sin ruta a internet y hace pasar su tráfico por un proxy con allowlist de cuatro dominios. En el punto de la llamada a herramienta no hay nada: ni comprobación, ni registro de acciones del agente.
+ExploitGym, el benchmark en el centro del incidente de OpenAI/Hugging Face, aplica tres controles sobre el agente: contenedores sin ruta a internet con un proxy de allowlist de cuatro dominios, un scorer que revisa a posteriori si el agente se salió del camino previsto, y desde v1.1 una lista de denegación de herramientas de recuperación del proveedor en la petición a la API.
 
-Ese control tiene dos huecos y ninguno es un descuido. La fase de instalación es allow-all, porque los repositorios de paquetes no se pueden enumerar por adelantado, y es por donde pasó el incidente de julio. Y el tráfico del lado del proveedor, búsqueda web y MCP, no pasa por el proxy en absoluto: lo dice su propia documentación. El portero se coloca justo ahí.
+**Ninguno de los tres pregunta si una llamada encaja con el encargo autorizado, y ninguno mira las herramientas propias del agente.** Ahí se coloca el portero, y ahí ocurrió el incidente: el canal de coordinación de unos 1.200 agentes fue una caché de paquetes alojada internamente, un recurso alcanzable sobre el que nadie comprobaba la operación.
+
+Y hay una segunda función además de bloquear. No existe ningún dataset público con las acciones de agentes en un incidente real, y donde sí hubo registro, el 7 % estaba falseado porque los agentes sustituyeron parte del sistema que ejecuta las llamadas. Si corres agentes hay que registrar qué acción hizo cada uno y quién la hizo, desde código de confianza y fuera de su alcance de escritura. El portero es ese punto.
 
 ## Qué contiene la entrega
 
@@ -26,7 +28,7 @@ No ejecutamos ExploitGym: exige infraestructura de evaluación de capacidad peli
 
 La reproducción de la wiki muestra decisiones retrospectivas sobre acciones observadas. La prueba del ejecutor demuestra el veto en un entorno controlado. Ninguna de las dos permite afirmar que se habría evitado el incidente completo. Que los agentes de la wiki llegaran por el hueco de provider-side es una hipótesis consistente con la evidencia, no un mecanismo demostrado: el corpus no contiene ninguna llamada a herramienta.
 
-La carga legítima comparable todavía está pendiente de selección; si no se obtiene dentro del plazo, se usarán casos propios con límites declarados.
+Falta el grupo de control: ejemplos de agentes trabajando bien, para contar cuántos bloquea el portero por error. La wiki entera es comportamiento del incidente, así que por sí sola no permite medir eso. Si no aparece un conjunto público adecuado, se usan casos propios con límites declarados.
 
 ## Documentación
 
@@ -35,6 +37,7 @@ La carga legítima comparable todavía está pendiente de selección; si no se o
 - [Hallazgos sobre ExploitGym y su harness](docs/hallazgos-exploitgym.md), con fuentes y aviso de versión.
 - [Contexto y requisitos del sprint](docs/ai-incident-response-sprint.md).
 - [Datos de la wiki](data/collusion-wiki/) y [agregados y muestras de Hugging Face](docs/datos-replay-hf.json).
+- [Tareas pendientes](docs/tareas-pendientes.md).
 - [Instrucciones para trabajar en el repositorio](AGENTS.md).
 
 Para los conteos y supuestos del corpus, prevalece la revisión documentada en el diseño del proyecto sobre los resúmenes históricos del README de datos.

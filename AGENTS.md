@@ -5,7 +5,9 @@
 - [PRD](.codex/plans/PRD.md): requisitos, alcance y criterios de aceptación.
 - [Diseño del proyecto](docs/proyecto-portero-tool-calls.md): decisiones acordadas, esquema, datos, método y límites de las partes A y B.
 - [Documento del sprint](docs/ai-incident-response-sprint.md): contexto y requisitos de la entrega.
-- [Hallazgos sobre ExploitGym](docs/hallazgos-exploitgym.md): el control desplegado en el harness del caso, sus huecos declarados, sus fuentes y su aviso de versión.
+- [Hallazgos sobre ExploitGym](docs/hallazgos-exploitgym.md): los tres controles del harness del caso, sus versiones, sus fuentes y su aviso de versión.
+- [Hallazgos de METR y Redwood](docs/hallazgos-metr-redwood.md): el tablón sobre la caché de paquetes, las cifras y las transcripciones falseadas. Fuentes secundarias.
+- [Tareas pendientes](docs/tareas-pendientes.md).
 
 El diseño sustituye decisiones incompatibles de documentos históricos. Si aparece una contradicción entre el PRD y el diseño, comunicarla y resolverla con el usuario antes de cambiar el alcance. No usar plantillas ni instrucciones de otros agentes como especificación activa por defecto.
 
@@ -41,7 +43,8 @@ El diseño sustituye decisiones incompatibles de documentos históricos. Si apar
 - Los datos de Hugging Face son agregados y muestras. No reconstruir una supuesta traza original interpolando eventos, IDs o tiempos. En la matriz control × fase, expresar posiciones como fracciones de la campaña documentada, nunca como números de acción, y declarar el supuesto de encargo del que depende la clasificación.
 - Las allowlist de los dos escenarios se toman de la configuración publicada del harness, citando el commit consultado. No inferir una especificación de tarea cuando existe una política publicada.
 - No atribuir a la comprobación en la llamada un disparo más temprano que el del perímetro. El reconocimiento inicial está dentro de la forma de una tarea de desarrollo de exploits; su aportación es cobertura, no precocidad.
-- Que los agentes de la wiki llegaran por el hueco de provider-side es una hipótesis consistente, no un mecanismo demostrado. El corpus no contiene llamadas a herramienta. La carga legítima comparable aún debe seleccionarse; los casos propios deben identificarse como tales.
+- Que los agentes de la wiki llegaran por un canal que el control no gobernaba es una hipótesis consistente, no un mecanismo demostrado. El corpus no contiene llamadas a herramienta. Falta el grupo de control de trabajo correcto; los casos propios deben identificarse como tales.
+- Registrar siempre qué acción se comprobó y qué identidad la produjo, desde código de confianza. Es la segunda función del portero, no un detalle de implementación.
 - Comparar permisos solos con permisos y memoria. Medir efectos impedidos en pruebas controladas, tareas legítimas completadas, bloqueos erróneos, avisos, retenciones y coste, con cantidades y denominadores.
 - Verificar que un bloqueo evita invocar la herramienta, que la memoria queda separada por ID y que los límites resisten intentos simultáneos. IDs y políticas vienen del ejecutor de confianza; los argumentos del agente no pueden sustituirlos.
 - Separar decisiones retrospectivas sobre la wiki de la prueba de ejecución real. No afirmar prevención del incidente completo ni inventar cómo habría reaccionado un agente tras un bloqueo.
