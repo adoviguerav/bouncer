@@ -1,0 +1,255 @@
+# PRD — Bouncer
+
+**Estado:** alcance acordado; implementación y resultados pendientes.
+**Fecha:** 11 de septiembre de 2026.
+**Proyecto:** AI Incident Response Sprint, Track 1.
+**Tiempo disponible:** unas 12 horas de trabajo real.
+**Fuente de alcance:** [Documento del proyecto](../../docs/proyecto-portero-tool-calls.md).
+
+Este PRD convierte el diseño aprobado en requisitos y criterios de aceptación. El documento del proyecto conserva las explicaciones y el esquema general; este archivo define qué hay que entregar y cómo comprobarlo. No se ha implementado ni evaluado el portero todavía.
+
+## 1. Problema y objetivo
+
+Un agente puede proponer acciones que exceden sus permisos. Para hacer cumplir restricciones hace falta un control antes de ejecutar sus herramientas y una decisión que pueda revisarse después. Algunas restricciones se comprueban mirando una llamada; otras necesitan conocer lo que esa misma ejecución ya hizo.
+
+**Objetivo del hackathon:** probar esa idea con las ediciones de la wiki disponibles, usando políticas de experimento explícitas y reglas con memoria por ID. Complementar el análisis histórico con un ejecutor local controlado que permita comprobar que una llamada bloqueada no se ejecuta.
+
+El resultado esperado es evidencia reproducible sobre qué comprueba el portero, qué añade la memoria y qué trabajo legítimo impide. Un resultado sin mejora adicional de la capa 2 puede ser válido si está medido y explicado; no se ajustan las reglas para fabricar una mejora.
+
+### Usuarios y usos
+
+- **Investigador del proyecto:** prepara el corpus, define el escenario y reproduce decisiones bajo distintas políticas.
+- **Revisor del artefacto:** sigue una decisión hasta la regla y la edición de origen, ejecuta las pruebas y comprueba los límites del resultado.
+- **Operador de agentes, en una fase posterior:** conecta el control a llamadas originales con tareas, identidades y permisos conocidos.
+
+## 2. Alcance cerrado
+
+| Parte                       | Entrega                                                                                                                          | Compromiso                                                   |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **A. Wiki**                 | Preparación de datos, permisos, memoria por ID, reproducción cronológica, log, pruebas del ejecutor y comparación de resultados. | Implementar ahora.                                           |
+| **B. Información completa** | Datos requeridos y propuesta de aplicación/evaluación en el escenario OpenAI/Hugging Face.                                       | Documentar ahora; implementar después, si se obtiene acceso. |
+
+| Componente | Cometido                                                                                      | Prioridad                                         |
+| ---------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| **Capa 1** | Hacer cumplir permisos sobre herramienta, operación, destino y argumentos disponibles.        | P0: obligatoria.                                  |
+| **Capa 2** | Aplicar restricciones que dependen del historial del mismo ID.                                | P0: reglas con memoria, sin detector estadístico. |
+| **Capa 3** | Revisar una llamada junto con el encargo autorizado y la evidencia del caso usando un modelo. | P1: opcional completa, incluida su interfaz.      |
+| **Capa 4** | Buscar patrones entre IDs y aportar evidencia colectiva.                                      | P1: experimento opcional con la wiki.             |
+
+Las capas 1 y 2 pueden ser parte del mismo programa. El análisis individual y el colectivo son perspectivas paralelas, no filtros consecutivos; sus señales pueden reunirse para una única revisión con el modelo. Los bloqueos explícitos prevalecen sobre esa revisión.
+
+### Fuera del mínimo
+
+No se exige un modelo estadístico de rareza, aprendizaje de transiciones, z-scores, calentamiento, sospecha con decaimiento, entrenamiento de clasificadores, interfaz web, base de datos, plataforma de observabilidad, integración de producción, agente atacante real, vídeo ni atestación criptográfica de logs. Tampoco acceso a datos privados de OpenAI o una reconstrucción inventada de toda la campaña de Hugging Face.
+
+No se termina un `run` completo por defecto: el mínimo bloquea llamadas. La decisión «eliminatoria», si se usa como etiqueta, debe remitir a una regla explícita y a un alcance de bloqueo definido.
+
+## 3. Datos y supuestos de la parte A
+
+Fuente principal: [corpus local de la wiki](../../data/collusion-wiki/), especialmente `revisions.jsonl.gz` y `labels.jsonl.gz`.
+
+| Hecho verificado en el diseño                                                                        | Uso en el PRD                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 14.591 revisiones originales.                                                                        | Denominador de entrada; conservar los archivos originales.                                                                                  |
+| 31 revisiones de los tres nombres identificados como humanos y 899 sin nombre.                       | Excluir los humanos; intentar recuperar identidades faltantes solo por referencias explícitas y no ambiguas.                                |
+| 13.661 revisiones con nombre no humano, 3.099 IDs; mediana 2; 86 IDs con más de 20 revisiones.       | Conteo de referencia antes de recuperaciones adicionales documentadas. Nombre literal como ID, sin resolver identidades por IP o semejanza. |
+| `label`, `time`, `page_key`, `body` y `rev_id` disponibles en revisiones.                            | Base del evento observado. `wiki.edit` es una adaptación declarada, no el nombre recuperado de la herramienta original.                     |
+| El cuerpo es una versión guardada de la página.                                                      | No atribuir todo el texto al último autor; las adiciones requieren una base o procedencia verificable. Un cuerpo vacío puede ser válido.    |
+| `page_family` clasifica páginas con cobertura y certeza desiguales.                                  | Solo evaluación, junto con sus derivados; nunca entrada de los detectores ni sustituto del encargo autorizado.                              |
+| Enlaces citados, resúmenes por nombre y otros archivos no son una trayectoria adicional de llamadas. | No contar URLs como visitas ni convertir agregados en eventos o información futura disponible en línea.                                     |
+
+**Campos imprescindibles para el historial:** ID, hora interpretable y página. Si faltan, recuperar con evidencia explícita o excluir del análisis afectado, indicando el motivo. Los campos opcionales ausentes no provocan por sí solos el descarte. Las uniones no deben multiplicar una revisión por contener varios mensajes o enlaces.
+
+El encargo y los permisos históricos no están completos. La política asignada al experimento describe el escenario que probamos y se distingue de cualquier dato observado. No se deduce la tarea a partir de `page_family` o de una justificación generada por el agente.
+
+**Dos escenarios de permisos.** Se evalúan y se informan los dos.
+
+- **Estricto:** la allowlist se deriva de la tarea documentada y la wiki queda fuera. La capa 1 bloquea en el primer intento de cada ID y las capas siguientes no reciben nada. Es un resultado por sí mismo y se presenta como tal: el control más barato habría cortado esta actividad en la primera acción.
+- **Permisivo:** allowlist ancha, porque una tarea de búsqueda web no tiene destinos enumerables por adelantado. La wiki cae dentro y ahí se mide qué añaden las restricciones con memoria sobre destinos permitidos.
+
+La justificación del permisivo es esa imposibilidad de enumerar destinos, que es la misma razón estructural por la que hubo que permitir el proxy de paquetes en el incidente de julio. **No es que las capas siguientes necesiten trabajo**; presentarlo así invalida la comparación.
+
+En el escenario permisivo, la restricción de la capa 2 sale de la forma de la tarea, que es de lectura, y no de lo que convenga que dispare. Restringir la operación permitiendo el destino es capa 1 sobre otro eje, y se informa como hallazgo. Los límites acumulativos propios de la capa 2 llevan parámetro: se declara antes de evaluar y no se ajusta para mejorar el resultado. Si la capa 2 no añade bloqueo sobre lo que ya resolvió la capa 1, se informa.
+
+El archivo [datos-replay-hf.json](../../docs/datos-replay-hf.json) contiene agregados y 21 ejemplos. No constituye 17.613 llamadas reproducibles. Su uso es contextual o como inspiración de pruebas propias identificadas como tales.
+
+**Carga legítima pendiente:** seleccionar trazas adecuadas o preparar tareas propias con autorización conocida. No hay un corpus benigno descargado que pueda darse por validado. Preparación y evaluación usan ejemplos separados; la ausencia de datos externos se declara sin bloquear la realización de pruebas controladas.
+
+## 4. Flujos del usuario
+
+### A. Reproducir la wiki
+
+1. Seleccionar el corpus y una política de escenario con versión y procedencia.
+2. Preparar los eventos, conservar sus referencias y revisar el resumen de limpieza.
+3. Recorrerlos cronológicamente con capa 1 y con capas 1+2 en ejecuciones separadas y estados independientes.
+4. Obtener decisiones, reglas aplicadas, motivos, casos no evaluables y resultados agregados.
+5. Revisar casos concretos y generar una tabla o figura que muestre qué cambia al añadir memoria.
+
+El análisis no ejecuta instrucciones ni visita URLs del corpus. Continuar el archivo después de un bloqueo hipotético conserva la continuación histórica, no simula cómo habría reaccionado el agente bloqueado.
+
+### B. Comprobar el veto real
+
+1. Crear una tarea local conocida, IDs asignados por el ejecutor y permisos explícitos.
+2. Presentar llamadas permitidas, prohibidas y secuencias que alcanzan un límite definido.
+3. Observar qué llamadas invocan realmente la herramienta y qué efectos producen.
+4. Comprobar que bloqueos y retenciones impiden el efecto y que las operaciones legítimas terminan correctamente.
+
+### C. Revisar la extensión posterior
+
+Leer la parte B del diseño: qué datos faltan, dónde se integraría el control y cómo se compararían las extensiones. La entrega distingue esta propuesta de lo implementado y de lo medido.
+
+## 5. Requisitos P0 y aceptación
+
+Todos los requisitos P0 son parte del mínimo. Las observaciones de aceptación se convierten en pruebas y evidencias durante la implementación; no se marcan como aprobadas al redactar este PRD.
+
+| ID        | Requisito                                                                                | Observación que permite aceptarlo                                                                                                                                                                                                                                    |
+| --------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P0-01** | Preparar datos con identidad y procedencia.                                              | Los conteos concilian entrada, exclusiones, recuperaciones y filas utilizadas; los nombres no se fusionan ni los anónimos se convierten en un agente. Cada evento remite a su revisión original.                                                                     |
+| **P0-02** | Separar datos observados, adaptados y desconocidos.                                      | El registro identifica la operación adaptada, la política de escenario y el origen del ID. Un campo desconocido no se rellena con una etiqueta de evaluación. Se preservan cuerpos vacíos válidos.                                                                   |
+| **P0-03** | Aplicar permisos explícitos, con reglas YAML versionadas.                                | Una acción autorizada pasa; otra que incumple herramienta, operación, destino o argumento cubierto se bloquea con el ID de regla correcto. Una regla no evaluable en el histórico se registra como tal.                                                              |
+| **P0-04** | Aplicar reglas con memoria separada por ejecución e ID.                                  | Un presupuesto de una tarea de prueba permite las acciones dentro de su límite y bloquea la siguiente; otro ID conserva su propio presupuesto. La comprobación/reserva no permite que llamadas simultáneas excedan la cuota.                                         |
+| **P0-05** | Interponerse antes de ejecutar y mantener la autoridad del sistema.                      | La herramienta de prueba no se invoca ante bloqueo o retención. Los argumentos del agente no pueden sustituir el ID ni la política. La falta de datos imprescindibles en ejecución real no concede permiso.                                                          |
+| **P0-06** | Registrar decisiones y resultados verificables.                                          | Cada evento procesado tiene decisión o estado no evaluable, motivo y referencias. Cuando se ejecuta una llamada, su resultado o error se enlaza con la decisión; un error de ejecución no se presenta como éxito.                                                    |
+| **P0-07** | Reproducir y comparar de forma determinista.                                             | Mismos eventos y política producen las mismas decisiones y evidencias funcionales, excluidas mediciones de tiempo de cómputo. Los empates temporales tienen desempate reproducible sin afirmar orden real subsegundo.                                                |
+| **P0-08** | Evaluar permisos solos frente a permisos con memoria, en los dos escenarios de permisos. | Se entrega una tabla o figura con cantidades, denominadores, cambios entre versiones y coste por llamada; distingue histórico de pruebas con autorización conocida, e informa por separado el escenario estricto y el permisivo con la justificación de este último. |
+| **P0-09** | Entregar instrucciones y documentación de ambas partes.                                  | Otra persona puede reproducir preparación, pruebas y comparación con instrucciones verificadas. El informe presenta método, resultados, supuestos y limitaciones; la parte B queda descrita como trabajo posterior.                                                  |
+
+### Detalles que forman parte de estos requisitos
+
+**Reglas:** cada una identifica qué restricción aplica, de dónde procede, qué datos necesita y qué respuesta produce. Se documentan una versión basada en guía/tarea y las ampliaciones motivadas por el incidente. Ya se conocen los datos: no se afirma una congelación anterior sin un artefacto verificable. Cada versión se fija antes de evaluar sus resultados.
+
+**Memoria:** cada regla declara si cuenta intentos, autorizaciones o resultados confirmados y cuándo consume o libera presupuesto. En reproducción histórica se declara cómo se actualiza el estado ante un bloqueo hipotético. En ejecución controlada se usan las decisiones y resultados reales. No se inventa una restricción para forzar que la capa 2 mejore un escenario donde no hace falta.
+
+**Identidad:** `label` se usa literalmente en la wiki; un ID de reproducción separa experimentos sin fingir ser el `run_id` histórico. El ejecutor controlado asigna IDs desde código de confianza y mantiene memorias separadas. Asignar ID no sustituye restringir credenciales y permisos.
+
+**Cobertura del control:** la operación y los argumentos ejecutados son los que se comprobaron. Las pruebas cubren las herramientas integradas; no se promete inspeccionar toda acción interna de scripts arbitrarios ni procesos fuera del punto de intervención.
+
+## 6. Entradas, salidas y decisiones
+
+| Artefacto           | Contenido mínimo                                                                                                                                                                          |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Eventos preparados  | ID y referencia de origen, ID del agente y procedencia, ID de reproducción/ejecución, hora y calidad temporal, operación/destino/argumentos disponibles, campos adaptados y desconocidos. |
+| Política            | Versión, escenario/encargo, reglas identificadas, permisos, límites con memoria, origen y respuesta ante incumplimiento.                                                                  |
+| Resumen de limpieza | Entrada, exclusiones por motivo, recuperaciones con referencia y cantidades utilizadas por análisis.                                                                                      |
+| Log de decisiones   | Evento, IDs, política, reglas, decisión, motivo, evidencia, duración y estado/resultado de ejecución cuando proceda.                                                                      |
+| Resultados          | Comparaciones de versiones, cantidades y denominadores, errores en tareas conocidas, avisos/retenciones y coste; limitaciones y casos no evaluables.                                      |
+
+Se utilizan archivos locales: política YAML y registros JSONL. La organización concreta de módulos y nombres de archivos de salida se decide al implementar; no exige servicios nuevos.
+
+| Decisión     | Efecto en el ejecutor controlado                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Permitir** | Ejecutar y registrar. No equivale a demostrar que la acción sea inocua.                                                        |
+| **Avisar**   | Ejecutar y registrar advertencia si la regla permite continuar.                                                                |
+| **Retener**  | No ejecutar mientras falte una revisión requerida; sin revisor, devolver pendiente. No requiere construir una interfaz humana. |
+| **Bloquear** | No ejecutar esa llamada; identificar la regla que lo exige.                                                                    |
+
+«No evaluable» es un estado del análisis histórico cuando falta evidencia para una comprobación, no una aprobación. Un criterio explícito de bloqueo prevalece sobre cualquier señal o veredicto posterior. Ningún resultado borra el historial o amplía automáticamente permisos.
+
+## 7. Evaluación y definición de terminado
+
+### Qué se mide
+
+| Ámbito             | Métricas y límites                                                                                                                                                                                                                                                                     |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Wiki               | Revisiones utilizadas/excluidas, decisiones por política, casos no evaluables y primeras decisiones relevantes en el registro observado. No afirmar daño evitado o tarea histórica completada.                                                                                         |
+| Tareas controladas | Acciones prohibidas que llegaron al ejecutor, acciones legítimas bloqueadas, tareas legítimas terminadas y comportamiento al alcanzar límites.                                                                                                                                         |
+| Comparación        | Diferencia entre capa 1 y 1+2 en los dos escenarios de permisos. En el estricto, si 1 ya prohíbe toda escritura, no atribuir prevención adicional a las otras capas. En el permisivo, declarar junto al resultado la justificación del escenario y los parámetros fijados de antemano. |
+| Operación          | Duración de comprobación por llamada, número de decisiones y recursos de ejecución; sin prometer de antemano microsegundos o coste trivial.                                                                                                                                            |
+
+Las tasas de error se calculan solo donde hay una decisión de referencia independiente y un denominador declarado. Se informa de tamaño y origen de la muestra. Las tareas controladas no justifican una tasa general sobre agentes reales, y una función de página no es una etiqueta de autorización de llamada.
+
+### Contrato de cierre de la parte A
+
+- [ ] P0-01 a P0-09 cuentan con evidencia reproducible.
+- [ ] Las pruebas del núcleo pasan; ninguna llamada marcada para bloquear o retener alcanza la herramienta controlada.
+- [ ] La cuota y el aislamiento entre IDs se verifican, incluyendo simultaneidad.
+- [ ] Se han ejecutado casos legítimos y se publican resultados, incluidos los errores encontrados.
+- [ ] La comparación histórica no consulta etiquetas ni agregados futuros para decidir.
+- [ ] Se entregan política, eventos derivados con procedencia, conteos, log, pruebas y resultados.
+- [ ] Las instrucciones de reproducción se han seguido y verificado en el entorno documentado.
+- [ ] El informe distingue resultados de la wiki, pruebas del veto y propuesta de información completa.
+
+Para código productivo del núcleo, seguir RED–GREEN–IMPROVE y alcanzar al menos 80 % de cobertura automatizada, conforme a las instrucciones del proyecto. La cobertura no sustituye las comprobaciones de efectos e identidad. No se afirma que estas pruebas ya existan.
+
+## 8. Extensiones opcionales y su condición de entrada
+
+Solo se desarrollan si el núcleo y su evaluación están completos y queda tiempo sin consumir el reservado para el informe. Orden: capa 4, capa 3, vídeo/demo. Su ausencia no impide aceptar la parte A.
+
+### P1-01 — Análisis colectivo
+
+Agrupar por página y registrar la primera aparición de cada ID; comparar adopción y, si procede, contenido nuevo repetido con procedencia comprobada. Producir avisos con página, momento, participantes y evidencia. No bloquear agentes por compartir destino ni dar por demostrada coordinación a partir de una curva en S.
+
+Si se implementa, evaluar contra las categorías de `page_family` elegidas de antemano, excluyendo o separando las no utilizables. Comparar con popularidad y convergencia legítima, informar precisión, cobertura y demora. Las etiquetas y sus derivados permanecen fuera de las entradas del detector.
+
+### P1-02 — Revisión con un modelo
+
+Requiere casos con tarea autorizada, llamada, argumentos y decisión de referencia. Primer candidato: LLM pequeño local; clasificador especializado solo si resuelve la misma decisión con datos adecuados. No confundir detectar inyección de instrucciones con determinar autorización.
+
+Entrada: tarea/permisos de confianza, llamada y evidencia individual/colectiva relevante. Salida: compatible, incompatible o información insuficiente. Un fallo, timeout o JSON inválido mantiene pendiente la llamada; el modelo no tiene herramientas ni anula bloqueos explícitos.
+
+Medir qué errores corrige e introduce, retenciones, duración y recursos frente al núcleo sin modelo. La falta de encargo original en la wiki impide convertir una valoración del texto en una evaluación completa de autorización.
+
+## 9. Parte B — Requisitos para el caso con información completa
+
+La entrega actual documenta esta parte; no necesita conseguir sus datos ni implementar su integración. El escenario de aplicación es el operador de los agentes implicados en OpenAI/Hugging Face, sujeto a acceso y cobertura reales.
+
+### Información necesaria
+
+- IDs de ejecución e instancia, relación con subagentes y procedencia confiable.
+- Encargo original, instrucciones autorizadas y permisos vigentes por llamada.
+- Llamadas originales con ID, herramienta, argumentos, tiempos y orden documentado.
+- Decisiones, rechazos, resultados y errores enlazados a cada llamada.
+- Contexto recibido de herramientas o documentos y referencias para revisarlo.
+- Recursos compartidos y permisos de colaboración entre agentes.
+- Casos legítimos y problemáticos con referencia de evaluación adecuada.
+
+### Esquema de integración posterior
+
+```mermaid
+flowchart TD
+    A["Llamada y contexto de confianza"] --> B["1. Permisos"]
+    B -->|"Incumple"| X["Bloquear y registrar"]
+    B -->|"Cumple"| C["2. Análisis individual"]
+    B -->|"Cumple"| D["4. Análisis colectivo opcional"]
+    C -->|"Incumple regla dura"| X
+    C -->|"Sin bloqueo duro"| E["Reunir evidencia y aplicar criterio de revisión"]
+    D --> E
+    E -->|"Sin revisión requerida"| F["Permitir o avisar según política"]
+    E -->|"Revisión requerida y modelo disponible"| G["3. Revisión opcional con tarea y llamada"]
+    E -->|"Revisión requerida sin revisor"| H["Retener"]
+    G -->|"Compatible y reglas cumplidas"| F
+    G -->|"Incompatible"| X
+    G -->|"Información insuficiente o fallo"| H
+```
+
+El paralelismo es lógico, no una exigencia de servicios concurrentes. Una señal colectiva puede justificar revisión sin una señal individual. Un bloqueo duro siempre prevalece. El esquema no forma parte de la lista de funciones ya implementadas.
+
+Primero se verificaría la cobertura del registro y se evaluarían las decisiones sobre llamadas originales. Después se probaría la interposición en un entorno controlado. Se compararía cada añadido con el núcleo, midiendo seguridad, tareas legítimas completadas, retenciones y coste. La estadística de anomalías solo se incorporaría si resuelve un problema demostrado con referencia legítima comparable.
+
+Relacionar las llamadas con efectos en Hugging Face requiere referencias o correlaciones justificadas con telemetría externa. El control solo veta acciones que pasan por su ejecutor; no garantiza contener toda actividad de código autónomo ya lanzado. No se asegura un corte histórico exacto ni la prevención del incidente completo a partir de una reproducción fija.
+
+## 10. Plan de entrega
+
+| Fase | Trabajo                                                                                    | Tiempo orientativo | Salida                                |
+| ---- | ------------------------------------------------------------------------------------------ | ------------------ | ------------------------------------- |
+| 1    | Datos, escenarios, casos legítimos/prohibidos y reglas con origen.                         | 2 h                | P0-01/02 y política/casos preparados. |
+| 2    | Ejecutar pruebas primero e implementar permisos, memoria, identidad, adaptador y registro. | 4 h                | P0-03 a P0-06 y pruebas del núcleo.   |
+| 3    | Reproducción y comparación; revisar errores y producir tabla/figura y costes.              | 2 h                | P0-07/08 y evidencias.                |
+| 4    | Informe del equipo, instrucciones verificadas, limitaciones y empaquetado.                 | 4 h                | P0-09 y parte B documentada.          |
+
+La entrega incluye informe en plantilla oficial, abstract de hasta 150 palabras, autores, máximo 8 páginas sin referencias/apéndices y apéndice obligatorio de limitaciones y doble uso, según el diseño aprobado. El informe es escritura del equipo sobre su trabajo; este PRD no es ese informe. Publicación o despliegue no se realizan al crear el PRD.
+
+## 11. Riesgos y parámetros pendientes
+
+| Asunto                                       | Tratamiento acordado                                                                                                                                                                  |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Historias cortas e identidad aproximada.     | Nombre literal como ID; reglas con memoria; explicar cobertura y no prometer perfiles aprendidos.                                                                                     |
+| Falta de tarea histórica y trazas completas. | Políticas de escenario declaradas; no evaluable donde falte evidencia; tareas propias para comprobar autorización y efectos.                                                          |
+| Contenido heredado y datos de evaluación.    | No atribuir toda una página al último editor ni introducir etiquetas/estadísticas futuras en decisiones.                                                                              |
+| Instrucciones y URLs del corpus.             | Leer como datos; no ejecutarlas ni visitar sus destinos. Herramientas de prueba operan solo en recursos propios.                                                                      |
+| Credenciales, política y logs.               | Mantener identidad y política fuera del alcance de escritura del agente; no copiar secretos o cuerpos completos al log por defecto. No prometer integridad criptográfica inexistente. |
+| Deriva de alcance.                           | P0 se completa sin modelos ni población. No quitar pruebas o informe para incorporar P1 o parte B.                                                                                    |
+
+Antes de implementar las reglas se concretan escenarios autorizados, límites por tarea, qué cuenta cada presupuesto, ventanas si las hay, conjunto legítimo o tareas propias y separación entre preparación y evaluación. Son parámetros del experimento, no nuevas capas ni resultados ya conocidos. Un límite no se elige mirando qué cifra permite detectar mejor el mismo incidente que después se presentará como prueba.
+
+**Cierre de alcance:** implementar la prueba con wiki y el veto local, documentar la aplicación posterior con información completa y declarar las extensiones realmente realizadas. Mantener separado lo observado, lo supuesto y lo propuesto.

@@ -17,10 +17,10 @@ Revisión del 11 de septiembre de 2026 contra los archivos locales y los documen
 
 La idea general es un control entre la llamada a herramienta que propone el agente y su ejecución. Primero comprueba permisos. Después puede examinar el comportamiento individual y el colectivo; cuando hay sospechas que requieren interpretación, un modelo revisa la llamada junto con la tarea autorizada y su contexto.
 
-| Parte | Qué hacemos | Qué podemos afirmar |
-| --- | --- | --- |
-| **A. Experimento con la wiki — implementación actual** | Preparar las ediciones, usar los nombres como IDs, aplicar políticas declaradas y reglas con memoria, reproducir el registro y medir decisiones. Una prueba local del ejecutor comprueba el veto real. | Qué decisiones produce el método sobre los datos observados y si el programa hace cumplir sus reglas en pruebas controladas. |
-| **B. Caso con información completa — fase posterior** | Especificar los datos que pediríamos al operador de los agentes y cómo conectaríamos y evaluaríamos el sistema. OpenAI/Hugging Face es el escenario de aplicación que motiva esta extensión. | Cómo se haría la evaluación con tareas, IDs y llamadas originales. No que dispongamos de esos datos ni que ya hayamos demostrado prevención de aquel incidente. |
+| Parte                                                  | Qué hacemos                                                                                                                                                                                            | Qué podemos afirmar                                                                                                                                             |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A. Experimento con la wiki — implementación actual** | Preparar las ediciones, usar los nombres como IDs, aplicar políticas declaradas y reglas con memoria, reproducir el registro y medir decisiones. Una prueba local del ejecutor comprueba el veto real. | Qué decisiones produce el método sobre los datos observados y si el programa hace cumplir sus reglas en pruebas controladas.                                    |
+| **B. Caso con información completa — fase posterior**  | Especificar los datos que pediríamos al operador de los agentes y cómo conectaríamos y evaluaríamos el sistema. OpenAI/Hugging Face es el escenario de aplicación que motiva esta extensión.           | Cómo se haría la evaluación con tareas, IDs y llamadas originales. No que dispongamos de esos datos ni que ya hayamos demostrado prevención de aquel incidente. |
 
 La pregunta que guía ambas partes es: **¿qué restricciones podemos hacer cumplir, qué añade mirar las secuencias o reunir señales y cuánto trabajo legítimo impedimos?** El programa puede reutilizarse; la política y la referencia de comportamiento deben corresponder a cada tarea y entorno.
 
@@ -34,12 +34,12 @@ Conservamos la numeración de las cuatro capas para reconocerlas, pero **no son 
 
 Las capas 1 y 2 pueden vivir en el mismo programa. Que el análisis individual y colectivo estén en paralelo significa que ninguno depende de que el otro encuentre algo. No exige varios servicios, hilos ni llamadas concurrentes.
 
-| Componente | Pregunta que responde | Implementación con la wiki (parte A) |
-| --- | --- | --- |
-| **1. Reglas de permisos** | ¿Esta herramienta, operación, destino y argumentos están autorizados? | **Obligatoria.** Bloquea incumplimientos explícitos. |
-| **2. Análisis individual** | ¿La secuencia del mismo ID incumple una restricción o aporta señales que merecen revisión? | **Obligatoria, versión sencilla:** reglas con memoria. La detección estadística de anomalías queda para evaluar después. |
-| **3. Revisión con un modelo** | ¿La llamada encaja con el encargo autorizado cuando las reglas no bastan? | **Opcional completa**, incluida su integración. Primero se probaría un LLM pequeño; un clasificador especializado es otra opción si hay datos adecuados. |
-| **4. Análisis entre agentes** | ¿Existe un patrón compartido que no se ve mirando cada ID por separado? | **Opcional.** Experimento de coordinación con la wiki. |
+| Componente                    | Pregunta que responde                                                                      | Implementación con la wiki (parte A)                                                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1. Reglas de permisos**     | ¿Esta herramienta, operación, destino y argumentos están autorizados?                      | **Obligatoria.** Bloquea incumplimientos explícitos.                                                                                                     |
+| **2. Análisis individual**    | ¿La secuencia del mismo ID incumple una restricción o aporta señales que merecen revisión? | **Obligatoria, versión sencilla:** reglas con memoria. La detección estadística de anomalías queda para evaluar después.                                 |
+| **3. Revisión con un modelo** | ¿La llamada encaja con el encargo autorizado cuando las reglas no bastan?                  | **Opcional completa**, incluida su integración. Primero se probaría un LLM pequeño; un clasificador especializado es otra opción si hay datos adecuados. |
+| **4. Análisis entre agentes** | ¿Existe un patrón compartido que no se ve mirando cada ID por separado?                    | **Opcional.** Experimento de coordinación con la wiki.                                                                                                   |
 
 No se incluye como requisito un detector estadístico de rareza, una tabla de transiciones aprendida, z-scores, calentamiento ni sospecha acumulada con decaimiento. Se reconsideran solo si aparece un problema concreto que las reglas no resuelvan y datos suficientes para evaluar la alternativa.
 
@@ -89,17 +89,17 @@ Los conteos de esta sección proceden de los archivos, no de asumir que los res�
 
 ### 3.1. Wiki: registro de ediciones
 
-| Archivo | Contenido y uso |
-| --- | --- |
-| `revisions.jsonl.gz` | **14.591 ediciones**. Base del análisis: `rev_id`, `label`, `time`, `page_key`, `body` y procedencia temporal. |
-| `labels.jsonl.gz` | **3.103 filas**: 3 nombres humanos, 3.099 nombres no vacíos restantes y una etiqueta vacía. Incluye resúmenes; no añade una trayectoria de llamadas. |
-| `pages.jsonl.gz` | **4.579 páginas**. Incluye `page_family` y campos de método/confianza. Hay 671 páginas `off_store_unclassified`; no son 4.579 ejemplos con una clasificación utilizable. |
-| `events.jsonl.gz` | **19.913 sucesos del servidor**, entre ellos guardados y acciones del moderador. No es un registro completo de llamadas a herramientas de agentes. |
-| `records.jsonl.gz` | **13.703 registros de texto procesado**, con procedencia. Puede ayudar a estudiar mensajes y adiciones; no es necesario unirlo para obtener el `body` de una revisión. |
-| `links.jsonl.gz` | **23.877 filas de URLs, 225 hosts distintos**, enlazadas con registros mediante `record_ids`. Son enlaces citados; no demuestran que el agente los visitara. |
-| `other-wikis.json.gz` | **90 fragmentos de revisión de 8 páginas**, desde el 11 de mayo. Tienen hora y cambios de texto, pero no un ID de agente; no completan los historiales por nombre. |
-| `shortener-logs.json.gz` | **499 registros de enlaces** con hora y un contador de clics, sin ID de agente ni hora de cada clic. No permiten reconstruir quién visitó cada enlace. |
-| Otros archivos | Manifiesto, ZIP y notas de cobertura. El ZIP coincide con los cinco archivos comprimidos correspondientes; son copias, no acciones adicionales. |
+| Archivo                  | Contenido y uso                                                                                                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `revisions.jsonl.gz`     | **14.591 ediciones**. Base del análisis: `rev_id`, `label`, `time`, `page_key`, `body` y procedencia temporal.                                                           |
+| `labels.jsonl.gz`        | **3.103 filas**: 3 nombres humanos, 3.099 nombres no vacíos restantes y una etiqueta vacía. Incluye resúmenes; no añade una trayectoria de llamadas.                     |
+| `pages.jsonl.gz`         | **4.579 páginas**. Incluye `page_family` y campos de método/confianza. Hay 671 páginas `off_store_unclassified`; no son 4.579 ejemplos con una clasificación utilizable. |
+| `events.jsonl.gz`        | **19.913 sucesos del servidor**, entre ellos guardados y acciones del moderador. No es un registro completo de llamadas a herramientas de agentes.                       |
+| `records.jsonl.gz`       | **13.703 registros de texto procesado**, con procedencia. Puede ayudar a estudiar mensajes y adiciones; no es necesario unirlo para obtener el `body` de una revisión.   |
+| `links.jsonl.gz`         | **23.877 filas de URLs, 225 hosts distintos**, enlazadas con registros mediante `record_ids`. Son enlaces citados; no demuestran que el agente los visitara.             |
+| `other-wikis.json.gz`    | **90 fragmentos de revisión de 8 páginas**, desde el 11 de mayo. Tienen hora y cambios de texto, pero no un ID de agente; no completan los historiales por nombre.       |
+| `shortener-logs.json.gz` | **499 registros de enlaces** con hora y un contador de clics, sin ID de agente ni hora de cada clic. No permiten reconstruir quién visitó cada enlace.                   |
+| Otros archivos           | Manifiesto, ZIP y notas de cobertura. El ZIP coincide con los cinco archivos comprimidos correspondientes; son copias, no acciones adicionales.                          |
 
 **Población acordada para el experimento:** tratamos como agentes los nombres no vacíos que no están identificados como humanos. Usamos el nombre literal como ID, sin agruparlo por IP ni por semejanza del texto.
 
@@ -153,14 +153,14 @@ En la wiki se usa `label` como `agent_id`. Un identificador de reproducción sep
 
 El registro común incluye:
 
-| Dato | Para qué sirve |
-| --- | --- |
-| ID de evento y referencia de origen | Volver a la evidencia y evitar contar dos veces una acción. |
-| `run_id`, `agent_id` y procedencia del ID | Separar historiales y distinguir identidad real de la aproximación usada en la wiki. |
-| Hora y orden observado | Evaluar restricciones temporales cuando los datos lo permiten. |
-| Herramienta, operación, destino y argumentos disponibles | Evaluar la llamada. En la wiki, marcar expresamente los campos reconstruidos y desconocidos. |
-| Tarea autorizada y versión de política | Saber contra qué encargo y permisos se juzga. Se reciben del sistema; no se aceptan de una justificación escrita por el agente. |
-| Resultado de ejecución, cuando existe | Distinguir intento, permiso concedido y operación efectivamente terminada. |
+| Dato                                                     | Para qué sirve                                                                                                                  |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| ID de evento y referencia de origen                      | Volver a la evidencia y evitar contar dos veces una acción.                                                                     |
+| `run_id`, `agent_id` y procedencia del ID                | Separar historiales y distinguir identidad real de la aproximación usada en la wiki.                                            |
+| Hora y orden observado                                   | Evaluar restricciones temporales cuando los datos lo permiten.                                                                  |
+| Herramienta, operación, destino y argumentos disponibles | Evaluar la llamada. En la wiki, marcar expresamente los campos reconstruidos y desconocidos.                                    |
+| Tarea autorizada y versión de política                   | Saber contra qué encargo y permisos se juzga. Se reciben del sistema; no se aceptan de una justificación escrita por el agente. |
+| Resultado de ejecución, cuando existe                    | Distinguir intento, permiso concedido y operación efectivamente terminada.                                                      |
 
 En cada evento se distingue lo observado de lo asignado al experimento: el nombre y la hora proceden de la wiki; el ID de reproducción, la política de escenario y la representación `wiki.edit` los añade nuestro programa. El encargo original desconocido no se rellena con una etiqueta de página ni con una explicación escrita por un modelo.
 
@@ -184,6 +184,24 @@ Se comparan dos políticas:
 - **v1, ampliada con lo aprendido del incidente:** cada añadido explica qué caso pretende cubrir y qué evidencia lo motiva.
 
 Ya hemos leído el incidente. Salvo que aparezca un artefacto previo verificable, **no se afirmará que v0 se escribió antes de conocer los datos**. La diferencia v0/v1 es una comparación de cobertura, no un ensayo ciego. Cada versión se fija antes de su evaluación y se conserva su procedencia.
+
+#### Dos escenarios de permisos, no una política relajada
+
+La wiki cae dentro o fuera de la allowlist según el escenario. Los dos son realistas, se evalúan los dos y se informan los dos.
+
+**Escenario estricto.** La allowlist se deriva de la tarea documentada: las fuentes de datos que los agentes debían consultar. La wiki no está. La capa 1 bloquea en el primer intento de cada ID y las capas siguientes no reciben nada.
+
+Eso es un resultado y va primero en el informe: **el control más barato y más antiguo habría cortado esta actividad en la primera acción.** Para el Track 1 es una conclusión útil, y es un contraejemplo frente a la idea de que hace falta detección elaborada.
+
+**Escenario permisivo.** Una allowlist ancha, del tipo que se despliega cuando la tarea es de búsqueda web y sus destinos legítimos no se pueden enumerar por adelantado. La wiki cae dentro. Ahí se puede evaluar qué añaden las restricciones con memoria sobre destinos permitidos.
+
+**La justificación del escenario permisivo no es que las capas siguientes necesiten trabajo.** Es que una tarea de búsqueda web no tiene un conjunto cerrado de destinos, y ese mismo motivo estructural es el que obligó a permitir el proxy de paquetes en el incidente de julio. Presentarlo como «relajamos la política para que la capa 2 tenga algo que hacer» invalida la comparación, y así debe leerse si se escribe de esa manera.
+
+**Qué restricción aplica la capa 2 en el escenario permisivo.** Sale de la forma de la tarea, no de lo que convenga que dispare. La tarea documentada es de lectura, así que cualquier escritura queda fuera de su forma aunque el destino esté permitido.
+
+Conviene ver que esa restricción es capa 1 sobre otro eje: se permite el destino y se restringe la operación. Eso también es un hallazgo y se informa como tal, **aquí la restricción útil no era el destino sino la operación**. Lo que queda propiamente para la capa 2 son límites acumulativos, como destinos distintos por ejecución o escrituras repetidas sobre el mismo objetivo. Llevan parámetro; el parámetro se declara antes de evaluar y no se ajusta para mejorar el resultado.
+
+Si en el escenario permisivo la capa 2 no añade ningún bloqueo sobre lo que ya resolvió la capa 1, se informa de eso.
 
 ### Capa 2 — Análisis individual mediante reglas con memoria
 
@@ -235,12 +253,12 @@ El flujo mínimo, sin extensiones, es: **evento → permisos → reglas con memo
 
 Si se activa el análisis colectivo, este aporta señales junto al individual, según el esquema de la sección 2. Si se activa el revisor, recibe un único caso con las evidencias disponibles. Sin revisor, las llamadas que cumplen las reglas y no requieren revisión siguen pasando; las señales meramente informativas generan avisos. Una revisión obligatoria sin revisor disponible mantiene la llamada retenida; no se inventa una aprobación del modelo.
 
-| Respuesta | Efecto en un ejecutor; en la wiki se registra lo que habría decidido |
-| --- | --- |
-| Permitir | Ejecutar y registrar. «Normal» significa que no incumple las comprobaciones activas, no que se haya demostrado inocua. |
-| Avisar | Ejecutar y registrar una advertencia, solo si la regla admite continuar. |
-| Retener | No ejecutar mientras falta una revisión requerida. Si no hay revisor disponible, devolver estado pendiente; no pasar silenciosamente. |
-| Bloquear | No ejecutar esa llamada y registrar el criterio explícito. |
+| Respuesta | Efecto en un ejecutor; en la wiki se registra lo que habría decidido                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Permitir  | Ejecutar y registrar. «Normal» significa que no incumple las comprobaciones activas, no que se haya demostrado inocua.                |
+| Avisar    | Ejecutar y registrar una advertencia, solo si la regla admite continuar.                                                              |
+| Retener   | No ejecutar mientras falta una revisión requerida. Si no hay revisor disponible, devolver estado pendiente; no pasar silenciosamente. |
+| Bloquear  | No ejecutar esa llamada y registrar el criterio explícito.                                                                            |
 
 Bloquear una llamada y terminar toda la ejecución son acciones distintas. El mínimo bloquea llamadas; cortar un `run` completo necesita una regla expresa y una prueba de ese comportamiento. Ningún veredicto borra el historial ni modifica automáticamente los permisos.
 
@@ -274,7 +292,7 @@ Comparar **capa 1 sola** con **capas 1+2** sobre los mismos escenarios y políti
 
 Medir acciones indebidas impedidas en los casos etiquetados, acciones legítimas bloqueadas, ejecuciones legítimas que terminan la tarea, avisos y retenciones, y tiempo de comprobación por llamada. Mostrar cantidades y denominadores, no solo porcentajes. La ausencia de falsas alarmas en unas pocas pruebas no demuestra una tasa nula general.
 
-Si una política prohíbe escribir en la wiki, puede bloquear todas esas escrituras observadas. Eso no demuestra que las capas 2, 3 o 4 añadan prevención. Para probar restricciones sobre escrituras permitidas se utiliza otro escenario explícito; no se modifica la política histórica a escondidas para dar trabajo a las capas adicionales.
+Se informan los **dos escenarios de permisos** definidos en la capa 1. En el estricto, la capa 1 puede bloquear todas las escrituras observadas; eso no demuestra que las capas 2, 3 o 4 añadan prevención, y se dice así. El permisivo es donde se puede medir qué añaden las restricciones con memoria, y su justificación se declara junto al resultado. No se modifica la política a escondidas para dar trabajo a las capas adicionales.
 
 ### Uso de los datos históricos
 
@@ -288,12 +306,12 @@ La capa 4, si se implementa, añade precisión, cobertura y momento del aviso po
 
 ## 9. Trabajo y entregables de la parte A para 12 horas
 
-| Bloque | Trabajo | Presupuesto orientativo |
-| --- | --- | --- |
-| 1 | Preparar la wiki y sus supuestos; seleccionar escenarios y casos legítimos/prohibidos y concretar sus reglas. | 2 h |
-| 2 | Adaptador, IDs, capa 1, memoria y reglas de capa 2, registro y pruebas incrementales. | 4 h |
-| 3 | Ejecutar comparaciones, revisar errores, producir tabla o figura reproducible y medir coste. | 2 h |
-| 4 | Informe escrito por el equipo, limitaciones, referencias y empaquetado del artefacto. | 4 h |
+| Bloque | Trabajo                                                                                                       | Presupuesto orientativo |
+| ------ | ------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| 1      | Preparar la wiki y sus supuestos; seleccionar escenarios y casos legítimos/prohibidos y concretar sus reglas. | 2 h                     |
+| 2      | Adaptador, IDs, capa 1, memoria y reglas de capa 2, registro y pruebas incrementales.                         | 4 h                     |
+| 3      | Ejecutar comparaciones, revisar errores, producir tabla o figura reproducible y medir coste.                  | 2 h                     |
+| 4      | Informe escrito por el equipo, limitaciones, referencias y empaquetado del artefacto.                         | 4 h                     |
 
 Las capas opcionales no tienen horas reservadas: solo entran si el núcleo y su evaluación terminan antes. Prioridad entre extensiones de la parte A: **capa 4, después capa 3 con casos de tarea conocida, después vídeo o demo con un agente real**. No se sacrifica la evaluación de trabajo legítimo ni el informe para añadirlas. La parte B se entrega como diseño posterior, no como otra implementación dentro de este presupuesto.
 
@@ -318,16 +336,16 @@ Este archivo es el diseño de trabajo, no el informe de investigación ni un res
 
 ### 10.1. Qué datos pediríamos
 
-| Información | Qué permite comprobar | Diferencia respecto a la wiki |
-| --- | --- | --- |
-| ID de ejecución, ID de instancia de agente y relación con subagentes | Atribuir acciones y separar o relacionar historiales. | Sustituye el nombre usado como aproximación al ID. |
-| Encargo original, instrucciones autorizadas y permisos vigentes en cada momento | Decidir qué debía hacer el agente y qué tenía permitido. | Evita tener que definir un escenario experimental sin conocer el encargo histórico. |
-| Cada llamada original, con su ID, herramienta y argumentos | Comprobar la operación exacta, su destino y contenido. | Incluye lecturas, escrituras y otras herramientas; no solo ediciones de wiki. |
-| Momento de propuesta, decisión y ejecución, con orden y vínculo entre eventos | Evaluar secuencias, tiempos de respuesta y si el control llegó antes del efecto. | No confunde una escritura guardada con la llamada pendiente que la produjo. |
-| Resultados, errores y llamadas rechazadas | Distinguir intentos de acciones terminadas y conocer lo que el agente observó después. | Añade lo que el registro de ediciones no muestra. |
-| Qué agentes compartían tarea, recursos, información o permiso para colaborar | Comparar coordinación permitida con actividad fuera de alcance. | Compartir una página deja de ser la única pista disponible. |
-| Referencias a resultados de herramientas y documentos externos recibidos | Revisar el contexto relevante y, cuando se pueda, el origen de una instrucción o enlace. | No obliga a suponer que una URL publicada fue visitada o que un agente leyó una página. |
-| Casos legítimos y problemáticos con decisiones de referencia revisadas | Medir errores y comparar reglas, detectores y modelos. | Las etiquetas de función de página no se usan como sustituto de autorización de llamadas. |
+| Información                                                                     | Qué permite comprobar                                                                    | Diferencia respecto a la wiki                                                             |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| ID de ejecución, ID de instancia de agente y relación con subagentes            | Atribuir acciones y separar o relacionar historiales.                                    | Sustituye el nombre usado como aproximación al ID.                                        |
+| Encargo original, instrucciones autorizadas y permisos vigentes en cada momento | Decidir qué debía hacer el agente y qué tenía permitido.                                 | Evita tener que definir un escenario experimental sin conocer el encargo histórico.       |
+| Cada llamada original, con su ID, herramienta y argumentos                      | Comprobar la operación exacta, su destino y contenido.                                   | Incluye lecturas, escrituras y otras herramientas; no solo ediciones de wiki.             |
+| Momento de propuesta, decisión y ejecución, con orden y vínculo entre eventos   | Evaluar secuencias, tiempos de respuesta y si el control llegó antes del efecto.         | No confunde una escritura guardada con la llamada pendiente que la produjo.               |
+| Resultados, errores y llamadas rechazadas                                       | Distinguir intentos de acciones terminadas y conocer lo que el agente observó después.   | Añade lo que el registro de ediciones no muestra.                                         |
+| Qué agentes compartían tarea, recursos, información o permiso para colaborar    | Comparar coordinación permitida con actividad fuera de alcance.                          | Compartir una página deja de ser la única pista disponible.                               |
+| Referencias a resultados de herramientas y documentos externos recibidos        | Revisar el contexto relevante y, cuando se pueda, el origen de una instrucción o enlace. | No obliga a suponer que una URL publicada fue visitada o que un agente leyó una página.   |
+| Casos legítimos y problemáticos con decisiones de referencia revisadas          | Medir errores y comparar reglas, detectores y modelos.                                   | Las etiquetas de función de página no se usan como sustituto de autorización de llamadas. |
 
 El encargo, los IDs y los permisos deben proceder del sistema que controla la ejecución. No se acepta como autoridad una justificación creada por el agente. Si se conservan cambios legítimos de tarea o permisos, se registra qué versión estaba vigente para cada llamada.
 
