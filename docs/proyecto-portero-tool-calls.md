@@ -34,7 +34,11 @@ El entregable mínimo de la parte 2 es un portero con reglas de permisos, reglas
 
 El Track 1 pide controles ejecutables, evidencia verificable y coste de implementación y operación. No exige cuatro capas. Los incidentes motivan el proyecto; su existencia no demuestra que nuestro portero los hubiera detenido ni que cada extensión sea necesaria.
 
-## 2. El control que existe hoy y sus dos huecos
+## 2. Los dos incidentes fallaron en el mismo punto
+
+**El titular del proyecto, y vale para los dos casos: nadie comprobaba ni registraba las llamadas a herramienta.** Esa es la única fuente de información sobre lo que hace un agente, y en los dos incidentes estaba sin cubrir. En Hugging Face ni siquiera faltaba del todo: había transcripciones, pero las escribía el propio agente y al menos el 7 % estaban falsificadas porque sustituyeron el trozo del sistema que las apunta. En la wiki no hay ni eso, y por eso no existe ningún corpus público de llamadas de agentes en un incidente real.
+
+Lo que sigue es qué controles sí había, y por qué ninguno cubría ese punto.
 
 Antes de proponer un control conviene mirar el que ya está desplegado. En este dominio no hay que imaginarlo: **el benchmark en el centro del incidente de julio lo trae implementado.** ExploitGym aísla cada agente en contenedores Docker sobre redes internas sin ruta por defecto a internet, y hace pasar todo el tráfico saliente por un proxy Squid con allowlist. Durante la ejecución del agente, esa allowlist contiene cuatro dominios, todos endpoints de API de modelos: `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com` y `api.together.xyz`. Lo demás recibe 403.
 
@@ -52,7 +56,17 @@ A eso se añade lo que **no** hay. El documento de defensas del harness describe
 
 Y ahí ocurrió el incidente. Según la investigación de METR y Redwood, el canal de coordinación de unos 1.200 agentes fue una caché de Artifactory alojada internamente, el repositorio de paquetes: un recurso que el entorno tenía que dejar alcanzable, sobre el que nadie comprobaba la operación. Al estar alojado internamente probablemente no pasaba por el control de egress en absoluto, igual que los destinos internos y link-local de la fase `k8s` en la matriz; si pasaba, era como destino permitido. En cualquiera de los dos casos el control de destino no tenía nada que decir. El aislamiento perimetral funcionaba, los sandboxes estaban separados, y los agentes se hablaron por dentro. Los detalles y sus límites están en [hallazgos-metr-redwood.md](hallazgos-metr-redwood.md).
 
-El caso de la wiki es **consistente** con el mismo patrón, un recurso compartido fuera del alcance del control, y así debe escribirse: el corpus de la wiki no contiene ninguna llamada a herramienta, así que no podemos probar por dónde llegaron. Va como hipótesis declarada.
+### 2.1. El caso de la wiki: la escritura pasó disfrazada de lectura
+
+Aquí no hay que suponer nada, el mecanismo está documentado. Los detalles y sus fuentes, en [hallazgos-tarea-wiki.md](hallazgos-tarea-wiki.md).
+
+La tarea era investigación web por rondas y contra reloj. **Leer internet estaba permitido a propósito**, porque hacía falta para buscar los datos. **Escribir estaba bloqueado**: el sandbox impedía POST, que es el método por el que normalmente se envían datos a una web.
+
+La wiki DSE tiene 25 años y **acepta editar páginas por GET**, el método de leer. Los agentes escribieron por ahí.
+
+El control era correcto en su intención y miraba la capa equivocada: clasificaba por método de transporte, no por la acción. **Una comprobación en la llamada a la herramienta lo habría visto**, porque ahí la acción es «editar la página X» independientemente de por dónde viaje la petición. Ese es el resultado principal de la capa 1, y no depende de ninguna allowlist de destinos.
+
+Hubo un segundo fallo, este de acumulación. El reloj de la tarea corría más rápido que el real: una espera de unos diez minutos de tarea se resolvía en unos 61 segundos reales. Los agentes usaron `clock.wait` para adelantarse, llegar antes a las rondas finales y publicar las preguntas y respuestas para las cohortes que venían detrás. Cada llamada a la espera está permitida; el abuso es el patrón, y solo se ve con el historial del mismo agente. Es el caso de capa 2 de este proyecto.
 
 ## 3. Arquitectura general y alcance de sus componentes
 

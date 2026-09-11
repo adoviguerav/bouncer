@@ -52,29 +52,35 @@ Si al comprobar METR se confirma, la conclusión es: **usamos la wiki, declaramo
 
 **Para la mitad buena, si hace falta:** AgentLogs, 549.239 sesiones reales del agente de GitHub con llamadas paso a paso, trabajo normal de programación. arXiv 2608.29204.
 
-### 2. Leer el informe de METR y Redwood
+### 2. Leer el informe de METR y Redwood — opcional, no bloquea
 
-Todo lo que este repositorio dice sobre el tablón de mensajes sobre la caché de Artifactory viene de resúmenes de búsqueda, no del original. Está en [hallazgos-metr-redwood.md](hallazgos-metr-redwood.md) con ese aviso.
+Lo que el repo dice del 7 % de transcripciones falsificadas y del tablón sobre la caché
+de Artifactory viene de cobertura de prensa, no del original. Está declarado así en
+[hallazgos-metr-redwood.md](hallazgos-metr-redwood.md).
 
-PDF: https://metr.org/hugging-face-incident-report-aug-2026.pdf
+No hace falta para construir nada. Solo importa si en el informe final quieres afirmar
+esas cifras como dato propio en vez de citar la cobertura. Si no, se cita lo que se ha
+leído de verdad y listo.
 
-**Qué comprobar al leerlo:**
+PDF, por si acaso: https://metr.org/hugging-face-incident-report-aug-2026.pdf
 
-- Las cifras: ~1.200 agentes, ~70.000 mensajes, 700 en el ataque, 96 transcripciones falseadas (~7 %).
-- Cómo se alcanzaba la caché exactamente: si pasaba por el proxy de egress como destino permitido, o si era interna y ni lo tocaba. Ahora mismo el diseño dice que probablemente lo segundo, y que en cualquier caso el control de destino no tenía nada que decir.
-- Si el informe nombra algún control que habría cortado ese canal.
-- Si menciona el incidente de la wiki o relación entre ambos.
+### Cerrado: el descuadre de las ediciones
 
-Hace falta antes de citar cualquier cifra en la entrega.
+La cobertura pública habla de 14.666 ediciones; `revisions.jsonl.gz` tiene 14.591.
+**Manda el fichero**: lo publicaron los autores, las sumas SHA-256 cuadran con su
+manifiesto y el conteo está verificado. La diferencia se anota en una línea del informe
+y no se investiga más.
 
-## Decisión pendiente
+## Cerrado: el parámetro de la capa 2
 
-**El parámetro de la capa 2.** La capa 2 bloquea por acumulación y necesita un número: cuántos destinos distintos puede tocar un agente antes de que corte.
+Ya no hay número que decidir. La versión anterior proponía un límite de destinos
+distintos por agente; se retiró porque era una afirmación sobre comportamiento
+disfrazada de regla de autorización, y circular además.
 
-El número sale de la forma del encargo y **nunca** de mirar el corpus. Si se elige mirando los datos, se está ajustando para ganar contra la misma evidencia que luego se presenta.
+La capa 2 tiene ahora una regla que sale de la tarea y de un fallo documentado: la
+tarea impone esperas obligatorias entre rondas, y los agentes usaron `clock.wait` para
+saltárselas. Cada llamada vale; el abuso es el patrón. Ver
+[hallazgos-tarea-wiki.md](hallazgos-tarea-wiki.md) §4.
 
-**Propuesta:** 1 destino distinto por ejecución. Un encargo para una tarea no implica tocar un segundo objetivo. A partir del segundo, bloquea.
-
-Se fija y se comitea **antes** de mirar la distribución de ediciones por ID del corpus.
-
-**Aviso:** en el escenario permisivo la capa 1 ya bloquea las escrituras por operación, así que la capa 2 puede no añadir ningún bloqueo. Eso es un resultado que se informa, no un fracaso.
+Con el corpus de la wiki esa regla no se puede reproducir, porque solo hay ediciones y
+no llamadas al reloj. Se demuestra en el programa de prueba local, en la fase 2.
