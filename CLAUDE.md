@@ -21,9 +21,9 @@ Los datos son ficheros comprimidos en `data/collusion-wiki/`. Son 14.591 filas: 
 
 Para código del núcleo, pruebas primero y RED-GREEN-IMPROVE, con al menos un 80 % de cobertura. La cobertura no sustituye comprobar efectos e identidad.
 
-## Lo que este proyecto no es
+## Skills disponibles
 
-Las reglas y skills que vinieron con la plantilla del repositorio hablan de Next.js, React, Supabase, Tailwind y DaisyUI. **Nada de eso aplica aquí.** Ignorarlas.
+Solo quedan las dos que aplican: `security-review` y `tdd-workflow`. Las demás venían con la plantilla del repositorio y hablaban de Next.js, React, Supabase y Tailwind; se han borrado.
 
 ## Reglas propias
 
