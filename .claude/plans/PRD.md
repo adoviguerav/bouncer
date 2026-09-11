@@ -14,7 +14,7 @@ Este PRD convierte el diseño aprobado en requisitos y criterios de aceptación.
 
 Un agente puede proponer acciones que exceden sus permisos. Para hacer cumplir restricciones hace falta un control antes de ejecutar sus herramientas y una decisión que pueda revisarse después. Algunas restricciones se comprueban mirando una llamada; otras necesitan conocer lo que esa misma ejecución ya hizo.
 
-**La tesis del proyecto,** derivada de mirar el control que ya existe en el harness del incidente: todo el control sobre el agente es hoy perimetral (una allowlist de egress en la red) o retrospectivo (un scorer por tarea). En el punto de la llamada no hay nada. El portero se coloca ahí.
+**La tesis del proyecto,** derivada de mirar los controles que ya existen en el harness del incidente: son perimetral (allowlist de egress), retrospectivo (un scorer por tarea) y una lista de denegación de herramientas de recuperación del proveedor. Ninguno pregunta si una llamada encaja con el encargo autorizado, y ninguno mira las herramientas propias del agente. El portero se coloca ahí, y además produce el registro de qué acción hizo cada agente desde un punto que el agente no puede reescribir.
 
 **Objetivo del hackathon:** documentar ese hueco sobre el caso de referencia con la evidencia pública disponible, y probar la idea con las ediciones de la wiki, usando políticas de experimento tomadas de la configuración publicada del harness y reglas con memoria por ID. Complementar el análisis histórico con un ejecutor local controlado que permita comprobar que una llamada bloqueada no se ejecuta.
 
