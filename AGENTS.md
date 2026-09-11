@@ -5,6 +5,7 @@
 - [PRD](.codex/plans/PRD.md): requisitos, alcance y criterios de aceptación.
 - [Diseño del proyecto](docs/proyecto-portero-tool-calls.md): decisiones acordadas, esquema, datos, método y límites de las partes A y B.
 - [Documento del sprint](docs/ai-incident-response-sprint.md): contexto y requisitos de la entrega.
+- [Hallazgos sobre ExploitGym](docs/hallazgos-exploitgym.md): el control desplegado en el harness del caso, sus huecos declarados, sus fuentes y su aviso de versión.
 
 El diseño sustituye decisiones incompatibles de documentos históricos. Si aparece una contradicción entre el PRD y el diseño, comunicarla y resolverla con el usuario antes de cambiar el alcance. No usar plantillas ni instrucciones de otros agentes como especificación activa por defecto.
 
@@ -21,11 +22,13 @@ El diseño sustituye decisiones incompatibles de documentos históricos. Si apar
 
 ## Alcance cerrado
 
-- Presupuesto de la parte A: unas 12 horas. Implementar con la wiki un programa local con política YAML y entradas/salidas JSONL.
+- Orden de la entrega: primero la **parte 1**, el caso de referencia OpenAI/Hugging Face, y después la **parte 2**, la implementación con la wiki. Lo que ediciones anteriores llamaban parte A es ahora la parte 2, y la parte B es la parte 1.
+- Presupuesto de la parte 2: unas 12 horas. Implementar con la wiki un programa local con política YAML y entradas/salidas JSONL.
 - Capas obligatorias: **1, permisos explícitos**, y **2, reglas sencillas con memoria por ID**. Incluyen registro de decisiones y prueba del veto con un ejecutor controlado.
 - Capas opcionales: **3, revisión con modelo**, y **4, análisis colectivo**. El análisis individual y colectivo reúnen señales en paralelo lógico; no requieren servicios concurrentes. Priorizar núcleo y evaluación antes de extensiones.
 - No implementar estadística de rareza, transiciones aprendidas, z-scores ni decaimiento como requisitos. Una rareza no justifica por sí sola bloquear; cada bloqueo necesita un criterio explícito.
-- La parte B, con información completa del operador, queda definida para después. No presupone acceso a datos privados ni entra en la implementación del hackathon.
+- La parte 1, con información completa del operador, queda definida para después. No presupone acceso a datos privados ni entra en la implementación del hackathon. Sí produce ahora un artefacto evaluable: la matriz control × fase de ataque (P0-10).
+- No ejecutar ExploitGym. Exige infraestructura de evaluación de capacidad peligrosa y no cabe en el presupuesto. Sus instancias se usan solo como encargo autorizado de pruebas propias, y sus llamadas las escribimos nosotros y se declaran como tales.
 - Crear o actualizar documentación no autoriza por sí solo iniciar implementación, publicar ni desplegar.
 
 ## Datos y evaluación
@@ -35,7 +38,10 @@ El diseño sustituye decisiones incompatibles de documentos históricos. Si apar
 - Conservar procedencia, conteos de limpieza y distinción entre campos observados y asignados. `wiki.edit` es una adaptación, no la llamada original recuperada. Un ID de reproducción no es el ID histórico del ejecutor.
 - `body` puede conservar texto anterior; no atribuirlo entero al último editor. Una URL citada no prueba una visita. Respetar la incertidumbre de eventos con el mismo segundo y no usar información futura en decisiones cronológicas.
 - Reservar `page_family` y sus derivados para evaluación, nunca para reglas o señales. Etiquetas desconocidas no son negativos benignos; función de página no equivale a autorización de una llamada.
-- Los datos de Hugging Face son agregados y muestras. No reconstruir una supuesta traza original interpolando eventos, IDs o tiempos. La carga legítima comparable aún debe seleccionarse; los casos propios deben identificarse como tales.
+- Los datos de Hugging Face son agregados y muestras. No reconstruir una supuesta traza original interpolando eventos, IDs o tiempos. En la matriz control × fase, expresar posiciones como fracciones de la campaña documentada, nunca como números de acción, y declarar el supuesto de encargo del que depende la clasificación.
+- Las allowlist de los dos escenarios se toman de la configuración publicada del harness, citando el commit consultado. No inferir una especificación de tarea cuando existe una política publicada.
+- No atribuir a la comprobación en la llamada un disparo más temprano que el del perímetro. El reconocimiento inicial está dentro de la forma de una tarea de desarrollo de exploits; su aportación es cobertura, no precocidad.
+- Que los agentes de la wiki llegaran por el hueco de provider-side es una hipótesis consistente, no un mecanismo demostrado. El corpus no contiene llamadas a herramienta. La carga legítima comparable aún debe seleccionarse; los casos propios deben identificarse como tales.
 - Comparar permisos solos con permisos y memoria. Medir efectos impedidos en pruebas controladas, tareas legítimas completadas, bloqueos erróneos, avisos, retenciones y coste, con cantidades y denominadores.
 - Verificar que un bloqueo evita invocar la herramienta, que la memoria queda separada por ID y que los límites resisten intentos simultáneos. IDs y políticas vienen del ejecutor de confianza; los argumentos del agente no pueden sustituirlos.
 - Separar decisiones retrospectivas sobre la wiki de la prueba de ejecución real. No afirmar prevención del incidente completo ni inventar cómo habría reaccionado un agente tras un bloqueo.
