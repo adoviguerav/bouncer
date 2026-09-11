@@ -36,7 +36,7 @@ ExploitGym, el benchmark en el centro del incidente de julio, ya despliega contr
 | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | La red de instalación es allow-all.                            | Los repositorios de paquetes no se pueden enumerar por adelantado y sin ellos no hay entorno.          | Escenario permisivo de P0-03 y P0-08; límites acumulativos de P0-04. |
 | El tráfico del lado del proveedor no pasa por el proxy. **Tapado en v1.1 desde otra capa.** | Lo ejecuta el proveedor por cuenta del modelo. El proxy de LLM lo bloquea inspeccionando la petición: es prior art de comprobación en la llamada, con forma de lista de denegación de tipos de herramienta. | El punto de intervención de P0-05, citando ese precedente y sin atribuirse la capa. |
-| Ningún control pregunta si la llamada encaja con el encargo, ni mira las herramientas propias del agente. | El tablón de mensajes de ~1.200 agentes se montó escribiendo en la caché de paquetes: destino permitido, operación no comprobada. | P0-03 sobre operación además de destino, y P0-04 sobre acumulados. |
+| Ningún control pregunta si la llamada encaja con el encargo, ni mira las herramientas propias del agente. | El tablón de mensajes de unos 1.200 agentes se montó escribiendo en una caché de paquetes alojada internamente: un recurso alcanzable sobre el que nadie comprobaba la operación. | P0-03 sobre operación además de destino, y P0-04 sobre acumulados. |
 
 El harness tampoco documenta registro de acciones del agente. Sí tiene presupuesto por ejecución, pero mide gasto de API, no acciones: hay memoria contando la cosa equivocada, lo que sostiene P0-04.
 
@@ -86,7 +86,7 @@ Las trayectorias del incidente no son públicas. El benchmark sí lo es, pero ej
 
 Si hicieran falta trayectorias, saldrían del operador (sección 4.3) o de ejecutar el harness con el portero interpuesto en un entorno con autorización explícita y fuera de este presupuesto. Ninguna de las dos está disponible ahora y así se declara en el informe.
 
-Lo que sí se usa de material público y sin coste: la configuración del control existente como origen de las dos políticas, los agregados para la matriz, y un puñado de instancias de tarea (del orden de cinco a diez) como encargo autorizado de las pruebas del ejecutor controlado. Las llamadas de esas pruebas las escribimos nosotros y se declaran como propias.
+Lo que sí se usa de material público y sin coste: la configuración del control existente como instancia real de las dos políticas de destino, y los agregados para la matriz. Las instancias de tarea de ExploitGym **no entran en el código**: con `wiki.edit` como única herramienta del ejecutor, un encargo de desarrollo de exploits no encaja. El encargo de las pruebas es una tarea de experimento declarada y escrita por nosotros.
 
 ### 4.3. Información que se pediría al operador
 
@@ -143,7 +143,7 @@ El encargo y los permisos históricos no están completos. La política asignada
 
 **Dos escenarios de permisos, ambos tomados de la configuración publicada del harness del caso, no inventados por nosotros.** Se evalúan y se informan los dos.
 
-- **Estricto:** la allowlist es la política publicada de la fase de ejecución del harness, cuatro dominios de API de modelos, y la wiki queda fuera. La capa 1 bloquea en el primer intento de cada ID y las capas siguientes no reciben nada. Es un resultado por sí mismo y se presenta como tal: el control más barato habría cortado esta actividad en la primera acción.
+- **Estricto:** allowlist estrecha, usando como instancia concreta una real y publicada, la de la fase de ejecución del harness, cuatro dominios de API de modelos. No se afirma que fuera la política de los agentes de la wiki. La wiki queda fuera. La capa 1 bloquea en el primer intento de cada ID y las capas siguientes no reciben nada. Es un resultado por sí mismo y se presenta como tal: el control más barato habría cortado esta actividad en la primera acción.
 - **Permisivo:** la red de instalación del mismo harness, allow-all, porque los repositorios de paquetes no tienen destinos enumerables por adelantado. La wiki cae dentro y ahí se mide qué añaden las restricciones con memoria sobre destinos permitidos.
 
 La justificación del permisivo es esa imposibilidad de enumerar destinos, que es la misma razón estructural por la que hubo que permitir el proxy de paquetes en el incidente de julio, y que aquí deja de ser una analogía nuestra: es una fase documentada del propio harness. **No es que las capas siguientes necesiten trabajo**; presentarlo así invalida la comparación.
@@ -152,7 +152,7 @@ En el escenario permisivo, la restricción de la capa 2 sale de la forma del enc
 
 El archivo [datos-replay-hf.json](../../docs/datos-replay-hf.json) contiene agregados y 21 ejemplos. No constituye 17.613 llamadas reproducibles. Sus usos son tres: construir la matriz de la sección 4.1, contextualizar el incidente e inspirar pruebas propias identificadas como tales. No es entrada del portero en ningún caso.
 
-**Carga legítima pendiente.** Las instancias de ExploitGym aportan el encargo autorizado, que es la mitad que faltaba, pero un encargo no es una acción: el repositorio no publica ejecuciones y sin trayectorias no hay carga con la que medir falsas alarmas. Queda seleccionar trazas adecuadas o preparar tareas propias sobre encargos reales tomados de esas instancias. No hay un corpus benigno descargado que pueda darse por validado. Preparación y evaluación usan ejemplos separados; la ausencia de datos externos se declara sin bloquear la realización de pruebas controladas.
+**Carga legítima pendiente.** Las instancias de ExploitGym aportan el encargo autorizado, que es la mitad que faltaba, pero un encargo no es una acción: el repositorio no publica ejecuciones y sin trayectorias no hay carga con la que medir falsas alarmas. Queda seleccionar trazas adecuadas o preparar tareas propias con un encargo de experimento declarado. No hay un corpus benigno descargado que pueda darse por validado. Preparación y evaluación usan ejemplos separados; la ausencia de datos externos se declara sin bloquear la realización de pruebas controladas.
 
 ## 6. Flujos del usuario
 
@@ -203,7 +203,7 @@ Todos los requisitos P0 son parte del mínimo. Las observaciones de aceptación 
 
 ### Detalles que forman parte de estos requisitos
 
-**Reglas:** cada una identifica qué restricción aplica, de dónde procede, qué datos necesita y qué respuesta produce. Se documentan una versión v0 anclada a la guía aplicable y a la política publicada del harness, y las ampliaciones v1 motivadas por el incidente. Ya se conocen los datos: no se afirma una congelación anterior sin un artefacto verificable. Cada versión se fija antes de evaluar sus resultados.
+**Reglas:** una sola versión. Cada regla identifica qué restricción aplica, de dónde procede (la guía aplicable o la evidencia del incidente), qué datos necesita y qué respuesta produce. La política se fija antes de evaluar y no se toca después. No se comparan versiones de reglas entre sí: ya se conocen los datos, así que una congelación anterior no sería un ensayo ciego. La única comparación que se informa es capa 1 frente a capa 1+2, en los dos escenarios de destino.
 
 **Memoria:** cada regla declara si cuenta intentos, autorizaciones o resultados confirmados y cuándo consume o libera presupuesto. En reproducción histórica se declara cómo se actualiza el estado ante un bloqueo hipotético. En ejecución controlada se usan las decisiones y resultados reales. No se inventa una restricción para forzar que la capa 2 mejore un escenario donde no hace falta.
 
@@ -261,6 +261,8 @@ Para código productivo del núcleo, seguir RED–GREEN–IMPROVE y alcanzar al 
 
 ## 10. Extensiones opcionales y su condición de entrada
 
+**P1-00 — Escena de escritura sobre recurso compartido permitido.** Primera de la lista. Un segundo destino en el ejecutor controlado, un directorio compartido entre dos `agent_id`, donde la lectura está dentro de la forma del encargo y la escritura no. Demuestra el bloqueo por operación sobre un destino que el control de red no gobierna, que es el mecanismo documentado del tablón de mensajes. La escena es sintética y se etiqueta como tal: no hay corpus de ese canal. Coste estimado: una hora sobre el núcleo.
+
 Solo se desarrollan si el núcleo y su evaluación están completos y queda tiempo sin consumir el reservado para el informe. Orden: capa 4, capa 3, vídeo/demo. Su ausencia no impide aceptar la parte 2.
 
 ### P1-01 — Análisis colectivo
@@ -299,7 +301,7 @@ La entrega incluye informe en plantilla oficial, abstract de hasta 150 palabras,
 | Credenciales, política y logs.               | Mantener identidad y política fuera del alcance de escritura del agente; no copiar secretos o cuerpos completos al log por defecto. No prometer integridad criptográfica inexistente. |
 | Versiones del harness citado.                | Se consultó la rama `main`, no el tag de v1.0. Fijar el commit citado y volver a comprobar antes de publicar. No dar por hecho que la configuración consultada es la que corrió el incidente. |
 | Atribuir la wiki al hueco de provider-side.  | El corpus no contiene llamadas a herramienta. Se escribe como hipótesis consistente con la evidencia, nunca como mecanismo demostrado.                                                        |
-| Confundir encargo con trayectoria.           | Las instancias de ExploitGym son encargos. No son carga legítima ni sustituyen trazas; las llamadas de prueba son nuestras y se declaran como tales.                                          |
+| Confundir encargo con trayectoria.           | Las instancias de ExploitGym son encargos y no entran en el código. No son carga legítima ni sustituyen trazas; el encargo de las pruebas es de experimento y sus llamadas son nuestras.      |
 | Deriva de alcance.                           | P0 se completa sin modelos ni población. No quitar pruebas o informe para incorporar P1 o parte 1.                                                                                    |
 
 Antes de implementar las reglas se concretan escenarios autorizados, límites por tarea, qué cuenta cada presupuesto, ventanas si las hay, conjunto legítimo o tareas propias y separación entre preparación y evaluación. Son parámetros del experimento, no nuevas capas ni resultados ya conocidos. Un límite no se elige mirando qué cifra permite detectar mejor el mismo incidente que después se presentará como prueba.

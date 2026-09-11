@@ -35,6 +35,7 @@ La carga legítima comparable todavía está pendiente de selección; si no se o
 - [Hallazgos sobre ExploitGym y su harness](docs/hallazgos-exploitgym.md), con fuentes y aviso de versión.
 - [Contexto y requisitos del sprint](docs/ai-incident-response-sprint.md).
 - [Datos de la wiki](data/collusion-wiki/) y [agregados y muestras de Hugging Face](docs/datos-replay-hf.json).
+- [Tareas pendientes](docs/tareas-pendientes.md).
 - [Instrucciones para trabajar en el repositorio](AGENTS.md).
 
 Para los conteos y supuestos del corpus, prevalece la revisión documentada en el diseño del proyecto sobre los resúmenes históricos del README de datos.

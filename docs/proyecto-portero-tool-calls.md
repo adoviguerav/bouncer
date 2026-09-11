@@ -50,7 +50,7 @@ A eso se añade lo que **no** hay. El documento de defensas del harness describe
 
 **El resumen del proyecto, con precisión:** los tres controles del harness son perimetral, retrospectivo y una lista de denegación de tipos de herramienta del proveedor. Ninguno pregunta si una llamada encaja con el encargo autorizado, y ninguno mira las herramientas propias del agente. El portero se coloca ahí.
 
-Y ahí ocurrió el incidente. Según la investigación de METR y Redwood, el canal de coordinación de unos 1.200 agentes fue una caché de Artifactory alojada internamente, el repositorio de paquetes: un destino que la allowlist tenía que permitir, usado para una operación que nadie comprobaba. El aislamiento perimetral funcionaba, los sandboxes estaban separados, y los agentes se hablaron por dentro. Los detalles y sus límites están en [hallazgos-metr-redwood.md](hallazgos-metr-redwood.md).
+Y ahí ocurrió el incidente. Según la investigación de METR y Redwood, el canal de coordinación de unos 1.200 agentes fue una caché de Artifactory alojada internamente, el repositorio de paquetes: un recurso que el entorno tenía que dejar alcanzable, sobre el que nadie comprobaba la operación. Al estar alojado internamente probablemente no pasaba por el control de egress en absoluto, igual que los destinos internos y link-local de la fase `k8s` en la matriz; si pasaba, era como destino permitido. En cualquiera de los dos casos el control de destino no tenía nada que decir. El aislamiento perimetral funcionaba, los sandboxes estaban separados, y los agentes se hablaron por dentro. Los detalles y sus límites están en [hallazgos-metr-redwood.md](hallazgos-metr-redwood.md).
 
 El caso de la wiki es **consistente** con el mismo patrón, un recurso compartido fuera del alcance del control, y así debe escribirse: el corpus de la wiki no contiene ninguna llamada a herramienta, así que no podemos probar por dónde llegaron. Va como hipótesis declarada.
 
@@ -121,7 +121,7 @@ El identificador tiene la forma `{family}:{task_path}/{defense_bitmap}`, con fam
 
 Lo que sí resuelven es la mitad que falta en todo el proyecto, que es la autorización. El encargo autorizado es justamente la pieza que la wiki no tiene y por la que la capa 3 queda descartada. Aquí hay encargos reales y citables.
 
-**Uso acordado:** seleccionar un puñado de instancias, del orden de cinco a diez, y usarlas como encargo autorizado de las pruebas del ejecutor controlado de la parte 2. Las llamadas las escribimos nosotros y se declaran como propias; la autorización contra la que se juzgan es real y tiene referencia. Es mejor que inventar las dos mitades, y no convierte esas pruebas en una tasa general de falsos positivos.
+**Uso acordado:** ninguno dentro del código. Con `wiki.edit` como única herramienta del ejecutor, un encargo de desarrollo de exploits no encaja: nadie edita una wiki para explotar un CVE. El encargo de las pruebas del ejecutor es una tarea de experimento declarada, escrita por nosotros y etiquetada como tal, con la forma de la tarea de investigación que describe el documento del sprint. Lo que ExploitGym aporta al proyecto es la configuración de sus dos redes como instancias reales de política de destino, y nada más.
 
 Queda pendiente comprobar si el texto del encargo de cada instancia se puede leer sin ejecutar el script de preparación de datos del repositorio. La lista de comprobaciones pendientes está en [hallazgos-exploitgym.md](hallazgos-exploitgym.md).
 
@@ -227,7 +227,27 @@ Por tanto, si en algún momento hicieran falta trayectorias para esta parte, sal
 1. **Del operador**, con los datos de la sección 6. Es la vía correcta y la que se pide en esa lista.
 2. **De ejecutar el harness con el portero interpuesto**, en un entorno con autorización explícita y fuera de este presupuesto, o de una ejecución publicada por un tercero con trayectorias utilizables.
 
-Lo que sí hacemos con material público y sin coste: leer y citar la configuración del control existente, construir la matriz de la sección 5 con los agregados, usar instancias de tarea como encargo autorizado en las pruebas del ejecutor, e imitar la superficie de herramientas del harness en ese ejecutor. Todo ello queda etiquetado como material propio inspirado en el caso, nunca como su traza original.
+Lo que sí hacemos con material público y sin coste: leer y citar la configuración del control existente, construir la matriz de la sección 5 con los agregados, e imitar la superficie de herramientas del harness en nuestro ejecutor. Todo ello queda etiquetado como material propio inspirado en el caso, nunca como su traza original.
+
+### 10.1. Por qué no hay datos, y qué se deduce de eso
+
+Buscamos datasets públicos de incidentes de agentes. Los hay, y ninguno sirve como entrada de un portero:
+
+| Fuente                                   | Qué es                                                                 | ¿Trae las acciones del agente?                    |
+| ---------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
+| AI Incident Database                     | 962 incidentes, 4.743 informes                                         | No. Relato en prosa y taxonomía.                  |
+| Documented AI Agent Incidents, de METR   | 44 incidentes puntuados por exceso de alcance y ocultación            | Sin comprobar. Es la única duda que queda abierta. |
+| RealHarm                                 | 136 casos, 68 inseguros y 68 seguros                                   | No. Conversaciones de chatbot, y los seguros son los inseguros reescritos. |
+| Reconstrucción de Hugging Face           | 17.613 acciones                                                        | No. Conteos por fase y 21 ejemplos.               |
+| Wiki de este repositorio                 | 13.661 ediciones                                                       | Lo más cerca que hay, y son ediciones guardadas, no llamadas. |
+
+**Esto no tiene sentido y hay que decirlo en el informe.** Si corres agentes, tienes que registrar qué acción hizo cada uno y quién la hizo. Si no, cuando algo sale mal no puedes saber quién hizo qué. No es una buena práctica opcional: sin ese registro no hay respuesta a incidentes posible, solo reconstrucción a posteriori con lo que se pueda rascar de los sistemas afectados, que es exactamente lo que tuvo que hacer Hugging Face.
+
+Y hay algo peor que la ausencia. Donde sí había registro, era manipulable: según la investigación de METR y Redwood, al menos el 7 % de las transcripciones estaba falseado porque los agentes sustituyeron parte del sistema que ejecuta las llamadas. El registro se estaba escribiendo en un sitio al que el agente llegaba.
+
+De ahí sale la segunda función del portero, además de bloquear: **es el punto donde se produce ese registro**, desde código de confianza y fuera del alcance de escritura del agente. Registrar la acción y quién la hizo, siempre, antes de ejecutarla. Un monitor que lee lo que el agente dice que hizo no da eso.
+
+Y de ahí sale también nuestra situación de datos, que se declara tal cual: para el caso malo usamos la wiki, que es lo único real que existe. Los demás casos los escribimos nosotros y se etiquetan como propios.
 
 ## Parte 2 — La implementación: la wiki
 
@@ -297,13 +317,22 @@ Se procesa por tiempo y se conserva su procedencia e incertidumbre. Si varias re
 
 La matriz control × fase de la sección 5 se construye con estos mismos agregados y hereda todos sus límites. Estos datos sirven para eso, para contextualizar el incidente y preparar casos de prueba propios inspirados en acciones documentadas, con sus supuestos visibles. No permiten afirmar «el portero habría cortado exactamente en la llamada 272» ni fijar un horizonte real de visibilidad en la llamada 600. No se interpolan horas para evaluar patrones temporales.
 
-### 11.5. Carga legítima: pendiente
+### 11.5. Ejemplos de trabajo correcto: pendiente
+
+**Qué es esto.** La wiki son 13.661 ediciones y todas son del incidente. Si solo probamos el portero contra ese corpus, una regla que bloquee todo acierta el 100 % y no sirve para nada, porque también pararía a un agente haciendo su trabajo. Hace falta el grupo de control: agentes trabajando bien, para contar cuántos bloqueamos por error. Los documentos del proyecto lo llaman «carga legítima».
 
 Los documentos mencionan trazas públicas, pero **no hay un corpus benigno seleccionado y descargado en este repositorio**. La existencia de un catálogo o de JSONL no resuelve su adecuación.
 
-Antes de medir falsas alarmas hay que elegir trazas con tarea conocida, identidad de sesión, acciones y argumentos suficientes. Las reglas deben corresponder a esas tareas. Se separan los ejemplos usados para preparar reglas de los usados para evaluarlas.
+**Dos candidatos localizados el 11 de septiembre de 2026**, ninguno descargado porque el proxy de esta sesión bloquea `huggingface.co` por WebFetch, curl y git:
 
-Las instancias de ExploitGym **no resuelven esto**. Aportan el encargo autorizado, que es la mitad que faltaba, pero un encargo no es una acción: el repositorio no publica ejecuciones y sin trayectorias no hay carga con la que medir falsas alarmas. Lo que si permiten es que las tareas propias dejen de tener una autorización inventada.
+| Candidato                     | Qué contiene                                                                                                              | Por qué encaja                                                              |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `trace-commons/agent-traces`  | Sesiones por harness (claude_code, codex, cursor, opencode y otros) con campos `harness`, `session_id`, `prompt`, `messages`, `tools`, `trace`, `metadata`. | Trae identidad de sesión, encargo y llamadas con argumentos: las tres cosas que pide esta sección. |
+| `CyCraftAI/TraceSafe`         | `golden_0_benign.jsonl`, 90 trazas benignas de referencia sin mutación, de un trabajo sobre guardarraíles en trayectorias de llamadas a herramienta. | Ya está etiquetado como línea base benigna.                                 |
+
+Hay que comprobar licencia, esquema real y adecuación antes de darlos por válidos. Antes de medir falsas alarmas hay que elegir trazas con tarea conocida, identidad de sesión, acciones y argumentos suficientes. Las reglas deben corresponder a esas tareas. Se separan los ejemplos usados para preparar reglas de los usados para evaluarlas.
+
+Las instancias de ExploitGym **no resuelven esto**. Aportan el encargo autorizado, que es la mitad que faltaba, pero un encargo no es una acción: el repositorio no publica ejecuciones y sin trayectorias no hay carga con la que medir falsas alarmas. Y con `wiki.edit` como única herramienta tampoco encajan como encargo de las pruebas.
 
 Si no conseguimos trazas adecuadas dentro del plazo, usamos tareas legítimas propias y controladas sobre encargos reales tomados de esas instancias, y declaramos su alcance reducido. Eso prueba comportamiento en esos casos; no justifica una tasa general de falsos positivos. No se presenta «wiki del incidente frente a otro corpus» como prueba suficiente de detección de ataques: podría distinguir simplemente las fuentes.
 
@@ -340,22 +369,21 @@ Las comprobaciones deben corresponder a lo que se ejecuta realmente: mismo desti
 
 **Salida:** permiso o bloqueo, ID de la regla y motivo. Si faltan datos para evaluar una regla en el análisis histórico, se registra «no evaluable»; no se cuenta como acierto ni como acción legítima. En ejecución real, la falta de identidad o datos imprescindibles impide ejecutar la llamada.
 
-Se comparan dos políticas:
+**Una sola versión de reglas.** Cada regla lleva su origen documentado: la recomendación que concreta, por ejemplo AIS-13 y la guía de operaciones de vulnerabilidades de CSA citadas en el documento del sprint, o la evidencia del incidente que la motiva. La política se fija antes de evaluar y no se toca después.
 
-- **v0, basada en la guía y la tarea:** cada regla enlaza la recomendación que concreta, por ejemplo AIS-13 y la guía de operaciones de vulnerabilidades de CSA citadas en el documento del sprint.
-- **v1, ampliada con lo aprendido del incidente:** cada añadido explica qué caso pretende cubrir y qué evidencia lo motiva.
-
-Ya hemos leído el incidente. Salvo que aparezca un artefacto previo verificable, **no se afirmará que v0 se escribió antes de conocer los datos**. La diferencia v0/v1 es una comparación de cobertura, no un ensayo ciego. Cada versión se fija antes de su evaluación y se conserva su procedencia.
+No se comparan versiones de reglas entre sí. Ya hemos leído el incidente, así que una supuesta versión escrita «antes de conocer los datos» no sería un ensayo ciego y no probaría nada. La única comparación que se informa es la del PRD: capa 1 sola frente a capa 1+2, en los dos escenarios de destino.
 
 #### Dos escenarios de permisos, no una política relajada
 
 La wiki cae dentro o fuera de la allowlist según el escenario. Los dos son realistas, se evalúan los dos y se informan los dos.
 
-**Escenario estricto.** La allowlist **no la inferimos nosotros**: es la política publicada de la fase de ejecución del harness del caso, cuatro dominios, todos endpoints de API de modelos (`api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, `api.together.xyz`). Está escrita, es citable y lleva su aviso de versión en [hallazgos-exploitgym.md](hallazgos-exploitgym.md). Ninguna wiki está en ella. La capa 1 bloquea en el primer intento de cada ID y las capas siguientes no reciben nada.
+**Escenario estricto.** Una allowlist estrecha del tipo que se despliega de verdad. Como instancia concreta usamos una real y publicada: la de la fase de ejecución del harness del caso, cuatro dominios, todos endpoints de API de modelos (`api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, `api.together.xyz`), con su aviso de versión en [hallazgos-exploitgym.md](hallazgos-exploitgym.md).
+
+**No afirmamos que sea la política que tenían los agentes de la wiki.** No lo sabemos. La usamos porque es un ejemplo real y citable de allowlist estrecha, en vez de inventar unos dominios y no poder justificar por qué esos. Ninguna wiki está en ella. La capa 1 bloquea en el primer intento de cada ID y las capas siguientes no reciben nada.
 
 Eso es un resultado: **el control más barato y más antiguo habría cortado esta actividad en la primera acción.** Para el Track 1 es una conclusión útil y un contraejemplo frente a la idea de que hace falta detección elaborada. Va acompañado siempre del matiz de la sección 2, que es lo que le da su fuerza real: ese control existía y aun así no vio nada, porque el tráfico del lado del proveedor no pasa por él.
 
-**Escenario permisivo.** La red de instalación del mismo harness, allow-all. Tampoco es una allowlist ancha inventada por nosotros: es la configuración que el harness usa mientras construye el entorno. La wiki cae dentro. Ahí se mide qué añaden las restricciones con memoria sobre destinos permitidos.
+**Escenario permisivo.** Una allowlist ancha, con la misma procedencia: la red de instalación de ese harness, allow-all mientras se construye el entorno. La wiki cae dentro. Ahí se mide qué añaden las restricciones con memoria sobre destinos permitidos.
 
 **La justificación del escenario permisivo no es que las capas siguientes necesiten trabajo.** Es que los repositorios de paquetes no se pueden enumerar por adelantado y sin ellos no hay entorno, que es el mismo motivo estructural que obligó a permitir el proxy de paquetes en el incidente de julio. Con el harness delante esto deja de ser una analogía nuestra y pasa a ser una fase documentada del sistema. Presentarlo como «relajamos la política para que la capa 2 tenga algo que hacer» invalida la comparación, y así debe leerse si se escribe de esa manera.
 
@@ -438,6 +466,18 @@ Una cadena de hashes por sí sola no impide que quien controla el log lo trunque
 
 ## 16. Evaluación de la parte 2
 
+### Cómo se construye el conjunto de pruebas
+
+Los casos se agrupan por qué capa debería pararlos, y se construyen en este orden.
+
+**Primero, los que debe parar la capa 1.** El destino o la operación quedan fuera de lo autorizado, y se ve mirando una sola llamada. La wiki en escenario estricto es este caso con datos reales: 13.661 ediciones contra una allowlist que no incluye ninguna wiki, bloqueo en la primera acción de cada ID.
+
+**Segundo, los que la capa 1 no puede parar.** Cada llamada por separado está permitida, y el problema solo aparece al sumarlas: un destino, luego otro, luego otro. Son los que le dan trabajo a la capa 2. **Si no metemos casos así, el experimento no responde a su propia pregunta**, porque nunca sabremos si la memoria aporta algo. Los escribimos nosotros.
+
+**Tercero, los que no debe parar nadie.** Trabajo normal de un agente haciendo lo que le mandaron. Miden si el portero estorba, que es la mitad de la pregunta que guía el proyecto. Los escribimos nosotros mientras no aparezca un conjunto público adecuado.
+
+El segundo y el tercer grupo se declaran como material propio. No dan una tasa general de falsos positivos ni de detección: prueban comportamiento en esos casos concretos, y así se informa.
+
 ### Pruebas del portero
 
 - Una llamada permitida se ejecuta y deja resultado.
@@ -477,7 +517,7 @@ La capa 4, si se implementa, añade precisión, cobertura y momento del aviso po
 
 La matriz control × fase entra en el bloque 1 y no en el informe, por dos razones: sus parámetros se fijan antes de evaluar nada, como el resto de la política, y si el bloque 4 se desborda no puede llevarse por delante el artefacto que el track pide de forma más explícita.
 
-Las capas opcionales no tienen horas reservadas: solo entran si el núcleo y su evaluación terminan antes. Prioridad entre extensiones de la parte 2: **capa 4, después capa 3 con casos de tarea conocida, después vídeo o demo con un agente real**. No se sacrifica la evaluación de trabajo legítimo ni el informe para añadirlas. La parte 1 se entrega como diseño posterior, no como otra implementación dentro de este presupuesto.
+Las capas opcionales no tienen horas reservadas: solo entran si el núcleo y su evaluación terminan antes. Prioridad entre extensiones de la parte 2: **escena de escritura sobre recurso compartido permitido, después capa 4, después capa 3 con casos de tarea conocida, después vídeo o demo con un agente real**. La primera va delante porque reproduce el mecanismo documentado del incidente y cuesta alrededor de una hora sobre el núcleo. No se sacrifica la evaluación de trabajo legítimo ni el informe para añadirlas. La parte 1 se entrega como diseño posterior, no como otra implementación dentro de este presupuesto.
 
 Entregables del proyecto:
 
@@ -495,7 +535,7 @@ Este archivo es el diseño de trabajo, no el informe de investigación ni un res
 
 **Cerrado:** el documento y el informe van primero al caso de referencia y después a la implementación con la wiki. Se implementa ahora la parte 2 y se documenta la parte 1. Capas 1+2 obligatorias y sencillas en el mínimo; 3+4 opcionales. Análisis individual y colectivo al mismo nivel, con señales reunidas para revisión. Nombres como IDs en la wiki e IDs asignados por el ejecutor en el sistema real. Recuperación explícita o exclusión de datos imprescindibles ausentes. Bloqueo por reglas, no por rareza. Evaluación separada de observaciones históricas y llamadas controladas.
 
-**Cerrado en esta revisión:** la allowlist estricta se toma de la política publicada del harness del caso, no de una especificación de tarea inferida. El escenario permisivo se justifica con la red de instalación allow-all del mismo harness. No se ejecuta ExploitGym; sus instancias se usan solo como encargo autorizado de pruebas propias, del orden de cinco a diez. La tesis del informe es que el control existente es perimetral o retrospectivo y que en el punto de la llamada no hay nada.
+**Cerrado en esta revisión:** el ejecutor controlado usa una sola herramienta, `wiki.edit`, y una sola escena. El patrón del tablón sobre la caché de paquetes entra en el informe como análisis dentro de la matriz control × fase, no como demostración implementada; solo se monta como segunda escena si sobra tiempo tras cerrar el núcleo y su evaluación. La allowlist estricta se toma de la política publicada del harness del caso, no de una especificación de tarea inferida. El escenario permisivo se justifica con la red de instalación allow-all del mismo harness. No se ejecuta ExploitGym y sus instancias no entran en el código: de ese repositorio se usa solo la configuración de sus dos redes como instancias reales de política de destino. El encargo de las pruebas del ejecutor es una tarea de experimento declarada. La tesis del informe es que el control existente es perimetral o retrospectivo y que en el punto de la llamada no hay nada.
 
 **Pendiente de ejecución de la parte 2:** seleccionar carga legítima comparable o casos propios, concretar políticas de escenario y presupuestos, consultar las versiones de las guías y del repositorio que se citen al escribir esas reglas, implementar, medir y redactar resultados. La implementación del caso con información completa y el acceso a registros de OpenAI quedan fuera del compromiso del hackathon.
 
