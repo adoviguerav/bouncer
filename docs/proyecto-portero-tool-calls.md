@@ -1,0 +1,372 @@
+# Proyecto — El portero de llamadas a herramienta
+
+AI Incident Response Sprint (Apart Research × CeSIA), 11–13 septiembre de 2026.
+Track 1 principal. Presupuesto: unas 12 horas de trabajo real.
+
+**Estado: diseño definido en dos partes con el usuario; implementación y resultados pendientes.**
+Revisión del 11 de septiembre de 2026 contra los archivos locales y los documentos del sprint. La parte A se implementa en el hackathon; la parte B queda especificada para una fase posterior.
+
+- [Contexto y requisitos del sprint](ai-incident-response-sprint.md).
+- [Alternativas consideradas](alternativas-proyecto-sprint.md): antecedente histórico; este documento sustituye sus decisiones sobre alcance, capas y evaluación.
+- [Datos agregados de Hugging Face](datos-replay-hf.json).
+- [Archivos de la wiki](../data/collusion-wiki/).
+
+## 1. Un proyecto en dos partes
+
+**El cometido del proyecto es probar una idea de control de agentes con un dataset que ya tenemos: el de la wiki.** Documentamos qué permite comprobar, qué adaptaciones hacemos y qué información falta. Después explicamos cómo aplicaríamos la misma idea si dispusiéramos del registro completo del sistema que ejecuta los agentes.
+
+La idea general es un control entre la llamada a herramienta que propone el agente y su ejecución. Primero comprueba permisos. Después puede examinar el comportamiento individual y el colectivo; cuando hay sospechas que requieren interpretación, un modelo revisa la llamada junto con la tarea autorizada y su contexto.
+
+| Parte | Qué hacemos | Qué podemos afirmar |
+| --- | --- | --- |
+| **A. Experimento con la wiki — implementación actual** | Preparar las ediciones, usar los nombres como IDs, aplicar políticas declaradas y reglas con memoria, reproducir el registro y medir decisiones. Una prueba local del ejecutor comprueba el veto real. | Qué decisiones produce el método sobre los datos observados y si el programa hace cumplir sus reglas en pruebas controladas. |
+| **B. Caso con información completa — fase posterior** | Especificar los datos que pediríamos al operador de los agentes y cómo conectaríamos y evaluaríamos el sistema. OpenAI/Hugging Face es el escenario de aplicación que motiva esta extensión. | Cómo se haría la evaluación con tareas, IDs y llamadas originales. No que dispongamos de esos datos ni que ya hayamos demostrado prevención de aquel incidente. |
+
+La pregunta que guía ambas partes es: **¿qué restricciones podemos hacer cumplir, qué añade mirar las secuencias o reunir señales y cuánto trabajo legítimo impedimos?** El programa puede reutilizarse; la política y la referencia de comportamiento deben corresponder a cada tarea y entorno.
+
+El entregable mínimo de la parte A es un portero con reglas de permisos, reglas con memoria por ID, registro de decisiones y pruebas reproducibles sobre una adaptación explícita de la wiki. Puede funcionar sin un LLM supervisor y sin analizar a toda la población. La parte B se explica en este documento y en la discusión del proyecto, pero su implementación no entra en las doce horas.
+
+El Track 1 pide controles ejecutables, evidencia verificable y coste de implementación y operación. No exige cuatro capas. Los incidentes motivan el proyecto; su existencia no demuestra que nuestro portero los hubiera detenido ni que cada extensión sea necesaria.
+
+## 2. Arquitectura general y alcance de sus componentes
+
+Conservamos la numeración de las cuatro capas para reconocerlas, pero **no son cuatro filtros consecutivos**. Los permisos van primero. El análisis individual (2) y el análisis colectivo (4) son dos maneras de buscar problemas; alimentan la misma revisión del caso (3) cuando se necesita interpretar su significado.
+
+Las capas 1 y 2 pueden vivir en el mismo programa. Que el análisis individual y colectivo estén en paralelo significa que ninguno depende de que el otro encuentre algo. No exige varios servicios, hilos ni llamadas concurrentes.
+
+| Componente | Pregunta que responde | Implementación con la wiki (parte A) |
+| --- | --- | --- |
+| **1. Reglas de permisos** | ¿Esta herramienta, operación, destino y argumentos están autorizados? | **Obligatoria.** Bloquea incumplimientos explícitos. |
+| **2. Análisis individual** | ¿La secuencia del mismo ID incumple una restricción o aporta señales que merecen revisión? | **Obligatoria, versión sencilla:** reglas con memoria. La detección estadística de anomalías queda para evaluar después. |
+| **3. Revisión con un modelo** | ¿La llamada encaja con el encargo autorizado cuando las reglas no bastan? | **Opcional completa**, incluida su integración. Primero se probaría un LLM pequeño; un clasificador especializado es otra opción si hay datos adecuados. |
+| **4. Análisis entre agentes** | ¿Existe un patrón compartido que no se ve mirando cada ID por separado? | **Opcional.** Experimento de coordinación con la wiki. |
+
+No se incluye como requisito un detector estadístico de rareza, una tabla de transiciones aprendida, z-scores, calentamiento ni sospecha acumulada con decaimiento. Se reconsideran solo si aparece un problema concreto que las reglas no resuelvan y datos suficientes para evaluar la alternativa.
+
+**Una conducta rara no basta para bloquear.** Cada bloqueo debe remontar a un criterio explícito. Las etiquetas «normal», «sospechosa» y «eliminatoria» organizan las salidas; no sustituyen el criterio que las produce.
+
+### Esquema de la idea completa
+
+```mermaid
+flowchart TD
+    A["Llamada propuesta por un agente"] --> B["1. Comprobar permisos"]
+    B -->|"Incumplimiento explícito"| X["Bloquear y registrar"]
+    B -->|"Permitida"| C["Examinar comportamiento"]
+    C --> D["2. Individual: historial del mismo ID"]
+    C --> E["4. Colectivo opcional: patrones entre IDs"]
+    D -->|"Incumple una regla dura"| X
+    D -->|"Sin bloqueo duro: evidencias"| F["Reunir señales y comprobar si requiere revisión"]
+    E -->|"Evidencias"| F
+    F -->|"Sin revisión requerida y reglas cumplidas"| G["Permitir y registrar"]
+    F -->|"Revisión requerida y revisor activado"| H["3. Revisión opcional con modelo y tarea autorizada"]
+    F -->|"Revisión requerida sin revisor activado"| I["Retener y registrar"]
+    H -->|"Compatible"| G
+    H -->|"Incompatible"| X
+    H -->|"Información insuficiente o fallo"| J["Mantener pendiente de revisión"]
+```
+
+**El esquema representa el funcionamiento con llamadas pendientes de ejecutar.** En la parte A, su entrada principal será una edición que ya ocurrió y su salida una decisión retrospectiva. La prueba con un ejecutor local verifica aparte que el bloqueo impide una ejecución. El gráfico no significa que hayamos recuperado las llamadas originales ni implementado todos sus componentes.
+
+Un bloqueo duro de 1 o 2 prevalece siempre: no espera ni puede ser levantado por el modelo. Si 2 y 4 aportan sospechas sobre un mismo caso, se reúnen para una sola revisión. La coordinación puede disparar esa revisión aunque ningún ID resulte sospechoso individualmente. Las señales que la política considere solo advertencias se registran sin impedir continuar; si exige revisión, la llamada queda retenida hasta resolverla.
+
+## Parte A — Lo que implementamos con la wiki
+
+Las secciones 3 a 9 definen el trabajo actual. Las extensiones de modelos y coordinación que aparecen en ellas siguen siendo opcionales. La parte B posterior se especifica en la sección 10.
+
+## 3. Datos disponibles y recorrido del experimento
+
+### Del archivo al resultado
+
+1. Leer y preparar las revisiones sin modificar el corpus original; generar los conteos de limpieza.
+2. Convertir cada edición en un evento observado: ID tomado de `label`, hora, página, contenido disponible y referencia a `rev_id`. La operación `wiki.edit` se marca como adaptación.
+3. Asignar una política de experimento explícita. Como no conocemos todos los encargos originales, esa política define el escenario que estamos probando; no se presenta como el permiso histórico recuperado del agente.
+4. Recorrer los eventos cronológicamente con la capa 1 y las reglas con memoria de la capa 2. Guardar la decisión, su evidencia y los casos no evaluables. Ejecutar análisis colectivo solo si se implementa la extensión.
+5. Comparar resultados y producir tablas o figuras. Las pruebas con tareas propias aportan ejemplos con autorización conocida y verifican que una llamada bloqueada no ejecuta la herramienta.
+
+**Productos de esta parte:** eventos normalizados con procedencia, resumen de limpieza, políticas versionadas, log de decisiones, pruebas y resultados reproducibles. No incluye descargar una traza privada de OpenAI ni construir una campaña completa de Hugging Face a partir de sus agregados.
+
+Los conteos de esta sección proceden de los archivos, no de asumir que los resúmenes anteriores son correctos. Prevalecen sobre las cifras y descripciones incompatibles del README de datos y de los documentos históricos.
+
+### 3.1. Wiki: registro de ediciones
+
+| Archivo | Contenido y uso |
+| --- | --- |
+| `revisions.jsonl.gz` | **14.591 ediciones**. Base del análisis: `rev_id`, `label`, `time`, `page_key`, `body` y procedencia temporal. |
+| `labels.jsonl.gz` | **3.103 filas**: 3 nombres humanos, 3.099 nombres no vacíos restantes y una etiqueta vacía. Incluye resúmenes; no añade una trayectoria de llamadas. |
+| `pages.jsonl.gz` | **4.579 páginas**. Incluye `page_family` y campos de método/confianza. Hay 671 páginas `off_store_unclassified`; no son 4.579 ejemplos con una clasificación utilizable. |
+| `events.jsonl.gz` | **19.913 sucesos del servidor**, entre ellos guardados y acciones del moderador. No es un registro completo de llamadas a herramientas de agentes. |
+| `records.jsonl.gz` | **13.703 registros de texto procesado**, con procedencia. Puede ayudar a estudiar mensajes y adiciones; no es necesario unirlo para obtener el `body` de una revisión. |
+| `links.jsonl.gz` | **23.877 filas de URLs, 225 hosts distintos**, enlazadas con registros mediante `record_ids`. Son enlaces citados; no demuestran que el agente los visitara. |
+| `other-wikis.json.gz` | **90 fragmentos de revisión de 8 páginas**, desde el 11 de mayo. Tienen hora y cambios de texto, pero no un ID de agente; no completan los historiales por nombre. |
+| `shortener-logs.json.gz` | **499 registros de enlaces** con hora y un contador de clics, sin ID de agente ni hora de cada clic. No permiten reconstruir quién visitó cada enlace. |
+| Otros archivos | Manifiesto, ZIP y notas de cobertura. El ZIP coincide con los cinco archivos comprimidos correspondientes; son copias, no acciones adicionales. |
+
+**Población acordada para el experimento:** tratamos como agentes los nombres no vacíos que no están identificados como humanos. Usamos el nombre literal como ID, sin agruparlo por IP ni por semejanza del texto.
+
+Al excluir las 31 ediciones de los tres nombres humanos y las 899 sin nombre, quedan **13.661 ediciones de 3.099 IDs**. La mediana es **2 ediciones por ID**; solo **86 IDs superan 20 ediciones**. Son historiales cortos: no justifican aprender las costumbres de cada agente.
+
+Las revisiones principales van del 24 de mayo al 2 de julio de 2026. Las fechas de otros archivos describen otras poblaciones: no se presenta el primer fragmento del 11 de mayo como la primera llamada identificada de esta tabla.
+
+El supuesto se declara una vez: un nombre representa un ID a efectos del análisis; el corpus no permite distinguir de forma fiable nombres compartidos o cambios de nombre. No se intenta resolver esa identidad mediante inferencias.
+
+### 3.2. Qué no podemos deducir de esas ediciones
+
+- Una edición observada no contiene necesariamente el nombre y todos los argumentos de la herramienta original. Representarla como `wiki.edit` es una adaptación declarada, no recuperar la llamada original.
+- Faltan lecturas, llamadas a otras herramientas y otros intentos. Un intervalo entre ediciones mide ritmo de escritura observado, no ritmo total del agente.
+- `body` contiene el texto guardado de la página, que puede conservar aportaciones anteriores. No atribuimos todo ese contenido al autor de la última edición. Para estudiar propagación se usan cambios respecto a una base disponible o adiciones con procedencia comprobada.
+- `stored_revisions`, `save_requests`, listas de páginas y otras cifras de `labels` son resúmenes. No se convierten en eventos con horas inventadas ni se usan para conocer el futuro durante una reproducción cronológica.
+- `page_family` describe la función atribuida a una página. No decide si cada edición estaba autorizada ni proporciona el encargo original del agente.
+
+### 3.3. Recuperación, limpieza y orden
+
+Para seguir un historial de la wiki hacen falta un ID, una hora interpretable y una página. Si falta uno, se intenta recuperar mediante una referencia explícita y no ambigua entre registros. Si no se puede, se excluye ese registro de ese análisis. No se inventan IDs ni se agrupan todos los anónimos en un agente ficticio.
+
+La necesidad del campo depende de la prueba: una comparación de contenido necesita texto; un recuento de acciones no. Un campo opcional ausente no invalida los demás datos. Una cadena vacía que representa una página vaciada puede ser un dato válido, no un NaN.
+
+Se conservan los originales y se genera un resumen de limpieza: filas de entrada, recuperadas, descartadas por motivo y usadas en cada evaluación. Las recuperaciones y uniones mantienen referencias a las filas de origen. No se fuerza una unión por semejanza de textos ni se multiplican acciones al unir varias URLs a una revisión.
+
+La unión por página con `pages` cubre todas las revisiones. Una unión con `records` por página y fecha puede devolver varios candidatos o compartir clave con varias revisiones; no demuestra por sí sola la autoría. No se arrastran las cifras previas de «69 %» o «9.233 filas completas» como condición para trabajar con texto: `revisions` ya lo contiene.
+
+Se procesa por tiempo y se conserva su procedencia e incertidumbre. Si varias revisiones comparten segundo, un desempate técnico permite reproducir la ejecución, pero no demuestra cuál ocurrió primero entre agentes. No se evalúan patrones que necesiten un orden subsegundo que no tenemos.
+
+### 3.4. Hugging Face: agregados y muestras
+
+`datos-replay-hf.json` contiene **9 fases, 5 totales diarios, 6 puntos de una curva acumulada y 21 eventos ilustrativos**. Los totales diarios suman **17.613 acciones**. Las fases suman 16.521, se solapan y no forman etapas consecutivas; la diferencia numérica no permite etiquetar acciones individuales ausentes.
+
+**No tenemos 17.613 llamadas con sus argumentos, IDs y timestamps.** Generar esa cantidad de filas hasta cuadrar los totales produciría una simulación. No recuperaría la secuencia real, el ritmo ni las llamadas exactas del orquestador.
+
+Estos datos sirven para contextualizar el incidente y preparar casos de prueba propios inspirados en acciones documentadas, con sus supuestos visibles. No permiten afirmar «el portero habría cortado exactamente en la llamada 272» ni fijar un horizonte real de visibilidad en la llamada 600. No se interpolan horas para evaluar patrones temporales.
+
+### 3.5. Carga legítima: pendiente
+
+Los documentos mencionan trazas públicas, pero **no hay un corpus benigno seleccionado y descargado en este repositorio**. La existencia de un catálogo o de JSONL no resuelve su adecuación.
+
+Antes de medir falsas alarmas hay que elegir trazas con tarea conocida, identidad de sesión, acciones y argumentos suficientes. Las reglas deben corresponder a esas tareas. Se separan los ejemplos usados para preparar reglas de los usados para evaluarlas.
+
+Si no conseguimos trazas adecuadas dentro del plazo, usamos tareas legítimas propias y controladas, y declaramos su alcance reducido. Eso prueba comportamiento en esos casos; no justifica una tasa general de falsos positivos. No se presenta «wiki del incidente frente a otro corpus» como prueba suficiente de detección de ataques: podría distinguir simplemente las fuentes.
+
+## 4. Registro del experimento y correspondencia con el sistema real
+
+En las pruebas con un ejecutor controlado y en el futuro sistema real, el programa que crea una ejecución asigna su `run_id` y el ID de cada instancia de agente, `agent_id`. Los adjunta a cada llamada desde código de confianza. Los subagentes reciben IDs propios; compartir modelo no implica compartir ID. El texto generado por el agente no puede sustituir estos identificadores ni los permisos.
+
+En la wiki se usa `label` como `agent_id`. Un identificador de reproducción separa experimentos, pero no se presenta como el ID original de ejecución que el corpus no contiene. En trazas externas se conserva el significado documentado de sus IDs.
+
+El registro común incluye:
+
+| Dato | Para qué sirve |
+| --- | --- |
+| ID de evento y referencia de origen | Volver a la evidencia y evitar contar dos veces una acción. |
+| `run_id`, `agent_id` y procedencia del ID | Separar historiales y distinguir identidad real de la aproximación usada en la wiki. |
+| Hora y orden observado | Evaluar restricciones temporales cuando los datos lo permiten. |
+| Herramienta, operación, destino y argumentos disponibles | Evaluar la llamada. En la wiki, marcar expresamente los campos reconstruidos y desconocidos. |
+| Tarea autorizada y versión de política | Saber contra qué encargo y permisos se juzga. Se reciben del sistema; no se aceptan de una justificación escrita por el agente. |
+| Resultado de ejecución, cuando existe | Distinguir intento, permiso concedido y operación efectivamente terminada. |
+
+En cada evento se distingue lo observado de lo asignado al experimento: el nombre y la hora proceden de la wiki; el ID de reproducción, la política de escenario y la representación `wiki.edit` los añade nuestro programa. El encargo original desconocido no se rellena con una etiqueta de página ni con una explicación escrita por un modelo.
+
+Asignar un ID permite atribuir llamadas. No sustituye restringir credenciales, permisos y destinos. Si una integración mezcla agentes sin indicar quién produjo cada llamada, hay que corregir esa integración; el portero no lo deduce del contenido.
+
+## 5. Cómo funciona cada capa
+
+### Capa 1 — Reglas de permisos
+
+**Entrada:** llamada actual y política asignada a esa ejecución.
+
+**Operación:** comprobar herramientas permitidas, tipos y valores de argumentos, operación, destinos y rutas autorizadas. Las reglas se guardan en YAML con identificador, explicación, origen y respuesta al incumplimiento.
+
+Las comprobaciones deben corresponder a lo que se ejecuta realmente: mismo destino y argumentos validados, sin permitir que una redirección o un intermediario conviertan un permiso limitado en acceso arbitrario. El alcance depende de las herramientas integradas; mirar el nombre de una herramienta que ejecuta código no permite controlar automáticamente todas las acciones internas de ese código.
+
+**Salida:** permiso o bloqueo, ID de la regla y motivo. Si faltan datos para evaluar una regla en el análisis histórico, se registra «no evaluable»; no se cuenta como acierto ni como acción legítima. En ejecución real, la falta de identidad o datos imprescindibles impide ejecutar la llamada.
+
+Se comparan dos políticas:
+
+- **v0, basada en la guía y la tarea:** cada regla enlaza la recomendación que concreta, por ejemplo AIS-13 y la guía de operaciones de vulnerabilidades de CSA citadas en el documento del sprint.
+- **v1, ampliada con lo aprendido del incidente:** cada añadido explica qué caso pretende cubrir y qué evidencia lo motiva.
+
+Ya hemos leído el incidente. Salvo que aparezca un artefacto previo verificable, **no se afirmará que v0 se escribió antes de conocer los datos**. La diferencia v0/v1 es una comparación de cobertura, no un ensayo ciego. Cada versión se fija antes de su evaluación y se conserva su procedencia.
+
+### Capa 2 — Análisis individual mediante reglas con memoria
+
+**Entrada:** llamada actual, política y memoria de esa ejecución e ID.
+
+**Operación:** conservar los contadores o antecedentes que exige cada regla. Por ejemplo, un presupuesto de operaciones definido para la tarea, un límite autorizado de páginas modificadas o una secuencia de pasos expresamente requerida.
+
+Una llamada puede estar permitida por la capa 1 y superar un presupuesto al sumar las anteriores. Ese es el aporte propio de la capa 2. No necesita aprender qué es «normal» ni esperar K llamadas para empezar a funcionar.
+
+Cada regla debe especificar qué cuenta: intentos, operaciones autorizadas o resultados confirmados. Las cuotas que autorizan una acción se comprueban y reservan antes de ejecutarla, para que llamadas simultáneas no gasten dos veces el mismo permiso. El registro distingue intentos bloqueados y acciones ejecutadas.
+
+**Salida:** estado actualizado, evidencia de la secuencia y permiso, aviso, retención o bloqueo según la regla. Los límites duros vienen del encargo o de una política explícita. Un patrón exploratorio sin ese fundamento genera como máximo un aviso; no una expulsión automática por rareza.
+
+**No se inventarán reglas para justificar esta capa.** La memoria y las comprobaciones de restricciones definidas forman parte del núcleo; si un escenario no tiene una restricción útil sobre el historial, se informa de que la capa 2 no aporta un bloqueo adicional en ese escenario.
+
+Los límites y ventanas concretos se fijan al seleccionar las tareas y los casos de prueba. Esos parámetros pendientes no reabren el alcance ni se ajustan para obtener un buen resultado sobre el conjunto final de evaluación.
+
+### Capa 3 — Revisión con un modelo, opcional
+
+**Entrada:** encargo autorizado, permisos, herramienta y argumentos de la llamada pendiente, más el contexto reciente y las señales necesarias. No basta con comparar el nombre de la herramienta con una frase de objetivo.
+
+**Operación:** decidir si la llamada encaja con la tarea. Se puede invocar por un caso dudoso de las reglas o por una operación configurada para revisión; no tiene que depender exclusivamente de acumular sospecha en la capa 2.
+
+Primera opción a probar: un LLM pequeño de pesos abiertos en local. No se presupone que sea suficientemente preciso ni que todo LLM sea caro. Se miden errores, tiempo y recursos. Un clasificador especializado puede sustituirlo si resuelve esa misma decisión y dispone de ejemplos y evaluación adecuados. Un detector de texto malicioso o de inyección de instrucciones no equivale a un clasificador de autorización de llamadas.
+
+**Salida:** compatible con la tarea, incompatible o información insuficiente, con motivo y referencias a la evidencia. Compatible permite continuar solo si las reglas duras ya se cumplen; incompatible bloquea según la política de revisión; información insuficiente mantiene la llamada retenida. El modelo nunca levanta un bloqueo de las capas 1 o 2.
+
+La llamada queda pendiente mientras se revisa. Un error, timeout o respuesta inválida no equivale a permiso. No se dan herramientas al juez y se trata el contenido examinado como dato no confiable; una respuesta JSON válida no garantiza una decisión correcta.
+
+La wiki no aporta directamente pares completos «encargo original + llamada + decisión correcta». Sin ejemplos adecuados y sin tiempo para compararlo con el portero básico, esta capa queda sin implementar, incluida su interfaz. Una revisión humana puede resolver casos retenidos; construir una interfaz humana completa tampoco es obligatorio.
+
+### Capa 4 — Análisis entre agentes, opcional
+
+**Entrada:** acciones con ID, hora y página o destino; cambios de contenido cuando puedan atribuirse. No recibe las etiquetas de evaluación.
+
+**Operación inicial:** agrupar por página y registrar cuándo aparece por primera vez cada ID. Repetir una escritura con el mismo ID no añade un participante. Se estudia cómo llegan participantes nuevos y, si hay tiempo, la repetición de URLs o fragmentos poco comunes entre IDs.
+
+La curva en S es una hipótesis para comparar con alternativas simples, no una prueba de coordinación. La actividad legítima también puede converger o empezar tarde. Sin el encargo original no se afirma que una página esté fuera de la tarea a partir de su clasificación posterior.
+
+**Salida:** páginas señaladas, momento del aviso, IDs involucrados y evidencia. En la wiki es análisis sobre el log; no bloquea automáticamente a una población por compartir un destino. En la arquitectura posterior, esas evidencias se pueden reunir con las individuales para que la capa 3 revise el caso. No necesitan pasar primero por un umbral individual ni se ejecutan después del juez como un cuarto filtro.
+
+`page_family` y sus campos derivados quedan separados hasta la evaluación. Se define qué categorías se intentan detectar y cuáles no tienen etiqueta utilizable; desconocido no equivale a benigno. Además de las 671 páginas `off_store_unclassified`, hay 677 `source-or-unclassified` y 34 `unknown`, que no se convierten automáticamente en negativos. Se informa de la cobertura de esa selección y de cómo se construyeron las etiquetas: coincidir con una clasificación basada en nombres o texto no aporta por sí solo una validación independiente de coordinación. Tampoco se incorporan resúmenes futuros del corpus a una decisión que pretende ser en línea.
+
+Se compara con contar popularidad y con actividad legítima compartida. Si se usan datos sintéticos, deben incluir también convergencia legítima; no basta con oponer agentes independientes a agentes que se copian. El resultado describe detección de actividad asociada a las categorías elegidas, no demuestra intención, comunicación causal ni prevención de un escape.
+
+## 6. Decisiones, ejecución y registro
+
+El flujo mínimo, sin extensiones, es: **evento → permisos → reglas con memoria → decisión y registro**. En la reproducción de la wiki se emite una decisión retrospectiva sin ejecutar el contenido. En las pruebas del ejecutor y en la integración real, se decide antes de invocar la herramienta y se registra también el resultado cuando llega a ejecutarse.
+
+Si se activa el análisis colectivo, este aporta señales junto al individual, según el esquema de la sección 2. Si se activa el revisor, recibe un único caso con las evidencias disponibles. Sin revisor, las llamadas que cumplen las reglas y no requieren revisión siguen pasando; las señales meramente informativas generan avisos. Una revisión obligatoria sin revisor disponible mantiene la llamada retenida; no se inventa una aprobación del modelo.
+
+| Respuesta | Efecto en un ejecutor; en la wiki se registra lo que habría decidido |
+| --- | --- |
+| Permitir | Ejecutar y registrar. «Normal» significa que no incumple las comprobaciones activas, no que se haya demostrado inocua. |
+| Avisar | Ejecutar y registrar una advertencia, solo si la regla admite continuar. |
+| Retener | No ejecutar mientras falta una revisión requerida. Si no hay revisor disponible, devolver estado pendiente; no pasar silenciosamente. |
+| Bloquear | No ejecutar esa llamada y registrar el criterio explícito. |
+
+Bloquear una llamada y terminar toda la ejecución son acciones distintas. El mínimo bloquea llamadas; cortar un `run` completo necesita una regla expresa y una prueba de ese comportamiento. Ningún veredicto borra el historial ni modifica automáticamente los permisos.
+
+El log JSONL incluye evento, IDs, versión de política, reglas aplicadas, decisión, motivo, evidencia usada, duración de la comprobación y estado de ejecución. No se copian secretos ni cuerpos completos por defecto; se conservan referencias suficientes para revisar los ejemplos autorizados.
+
+## 7. Implementación de la parte A y frontera del control
+
+Programa local, política YAML, entradas y resultados JSONL. El recorrido principal es la reproducción de la wiki. Un único ejecutor controlado complementa ese análisis para demostrar el bloqueo; no necesita un agente real intentando escapar. El adaptador envuelve la ejecución de herramientas; una integración con LangGraph puede reutilizarlo sin exigir un servicio web, base de datos ni plataforma de observabilidad.
+
+El portero, sus IDs y su política deben quedar fuera del alcance de escritura del agente. La demostración declara qué herramientas pasan por el control y prueba que las llamadas bloqueadas no llegan al ejecutor. No se afirma proteger vías que no atraviesan ese punto ni procesos autónomos ya lanzados.
+
+La evidencia para terceros es la política, su origen, el adaptador, casos reproducibles y resultados con referencias. Eso permite revisar el artefacto sin entrar en una red de laboratorio; no certifica la contención de un laboratorio real.
+
+Una cadena de hashes por sí sola no impide que quien controla el log lo trunque o lo regenere. No es requisito del mínimo ni se presenta como garantía de integridad. Un sistema de atestación con anclaje externo quedaría para otro alcance.
+
+## 8. Evaluación de la parte A
+
+### Pruebas del portero
+
+- Una llamada permitida se ejecuta y deja resultado.
+- Una llamada prohibida por permisos no invoca la herramienta ni produce su efecto.
+- Un límite con memoria permite las acciones dentro del presupuesto y bloquea la siguiente que lo supera, incluyendo intentos simultáneos.
+- Los IDs mantienen memorias separadas. El agente no puede cambiar su ID o política mediante argumentos.
+- Datos imprescindibles ausentes y revisiones pendientes no se convierten en permiso silencioso.
+
+Se escriben las pruebas antes de implementar cada comportamiento y se ejecuta la suite del núcleo. Los casos positivos y negativos verifican restricciones concretas, no que el código repita una fórmula propia.
+
+### Comparación de versiones
+
+Comparar **capa 1 sola** con **capas 1+2** sobre los mismos escenarios y políticas compatibles. Para cada regla registrar qué caso cubre, su origen, qué necesita observar y su coste.
+
+Medir acciones indebidas impedidas en los casos etiquetados, acciones legítimas bloqueadas, ejecuciones legítimas que terminan la tarea, avisos y retenciones, y tiempo de comprobación por llamada. Mostrar cantidades y denominadores, no solo porcentajes. La ausencia de falsas alarmas en unas pocas pruebas no demuestra una tasa nula general.
+
+Si una política prohíbe escribir en la wiki, puede bloquear todas esas escrituras observadas. Eso no demuestra que las capas 2, 3 o 4 añadan prevención. Para probar restricciones sobre escrituras permitidas se utiliza otro escenario explícito; no se modifica la política histórica a escondidas para dar trabajo a las capas adicionales.
+
+### Uso de los datos históricos
+
+Reproducir la wiki cronológicamente y registrar qué habría decidido cada política sobre las ediciones evaluables. Es un resultado retrospectivo sobre escrituras observadas y supuestos declarados, no una demostración de que el incidente completo se habría evitado.
+
+Si se sigue recorriendo el archivo después de un bloqueo, las acciones siguientes son la continuación histórica observada, no lo que habría hecho el agente al recibir ese bloqueo. Se distingue ese análisis de una ejecución real detenida. La memoria cuenta intentos o ejecuciones según la regla y el modo declarado; no se deducen tareas completadas ni daños evitados de esa continuación.
+
+No se ejecutan URLs, instrucciones ni código del corpus. Los efectos de las herramientas se comprueban en entornos propios y controlados. Los ejemplos basados en Hugging Face se etiquetan como casos de prueba inspirados en sus muestras, no como su traza original.
+
+La capa 4, si se implementa, añade precisión, cobertura y momento del aviso por página en el conjunto con etiquetas utilizables. La capa 3 añade errores corregidos e introducidos, retenciones y coste frente a no usarla. Cada añadido debe mostrar qué mejora y qué empeora.
+
+## 9. Trabajo y entregables de la parte A para 12 horas
+
+| Bloque | Trabajo | Presupuesto orientativo |
+| --- | --- | --- |
+| 1 | Preparar la wiki y sus supuestos; seleccionar escenarios y casos legítimos/prohibidos y concretar sus reglas. | 2 h |
+| 2 | Adaptador, IDs, capa 1, memoria y reglas de capa 2, registro y pruebas incrementales. | 4 h |
+| 3 | Ejecutar comparaciones, revisar errores, producir tabla o figura reproducible y medir coste. | 2 h |
+| 4 | Informe escrito por el equipo, limitaciones, referencias y empaquetado del artefacto. | 4 h |
+
+Las capas opcionales no tienen horas reservadas: solo entran si el núcleo y su evaluación terminan antes. Prioridad entre extensiones de la parte A: **capa 4, después capa 3 con casos de tarea conocida, después vídeo o demo con un agente real**. No se sacrifica la evaluación de trabajo legítimo ni el informe para añadirlas. La parte B se entrega como diseño posterior, no como otra implementación dentro de este presupuesto.
+
+Entregables del proyecto:
+
+1. Política y tabla «regla → origen → restricción → evidencia de prueba → coste».
+2. Portero con IDs, memoria y adaptador a un ejecutor controlado.
+3. Preparación/reproducción de datos con conteos de limpieza y supuestos.
+4. Pruebas y comparación reproducible de capa 1 frente a 1+2; ampliaciones solo si se hicieron.
+5. Informe sobre la plantilla oficial, hasta 8 páginas sin referencias/apéndices, abstract de hasta 150 palabras, autores y apéndice obligatorio de limitaciones y doble uso, según el documento del sprint.
+6. Diseño de la parte B: esquema general, datos requeridos y procedimiento para evaluar el caso con información completa, claramente separado de los resultados de la wiki.
+
+Este archivo es el diseño de trabajo, no el informe de investigación ni un resultado experimental. La redacción de la entrega corresponde al equipo conforme a las reglas del sprint. La publicación y cualquier revisión de divulgación se tramitan cuando exista un artefacto concreto; no forman parte de esta edición del plan.
+
+## Parte B — Aplicación posterior con información completa
+
+## 10. Cómo se llevaría al sistema que ejecuta los agentes
+
+**Esta parte queda definida ahora y se implementaría después, condicionada al acceso a los datos y al ejecutor.** El caso de OpenAI/Hugging Face sirve para explicar qué información querríamos y qué controles podríamos evaluar. No se presupone que esa información exista completa, esté disponible públicamente o vaya a ser entregada.
+
+«Información completa» significa información suficiente para evaluar las llamadas dentro del alcance declarado. No implica leer las intenciones internas del modelo ni garantizar la seguridad de todo el entorno.
+
+### 10.1. Qué datos pediríamos
+
+| Información | Qué permite comprobar | Diferencia respecto a la wiki |
+| --- | --- | --- |
+| ID de ejecución, ID de instancia de agente y relación con subagentes | Atribuir acciones y separar o relacionar historiales. | Sustituye el nombre usado como aproximación al ID. |
+| Encargo original, instrucciones autorizadas y permisos vigentes en cada momento | Decidir qué debía hacer el agente y qué tenía permitido. | Evita tener que definir un escenario experimental sin conocer el encargo histórico. |
+| Cada llamada original, con su ID, herramienta y argumentos | Comprobar la operación exacta, su destino y contenido. | Incluye lecturas, escrituras y otras herramientas; no solo ediciones de wiki. |
+| Momento de propuesta, decisión y ejecución, con orden y vínculo entre eventos | Evaluar secuencias, tiempos de respuesta y si el control llegó antes del efecto. | No confunde una escritura guardada con la llamada pendiente que la produjo. |
+| Resultados, errores y llamadas rechazadas | Distinguir intentos de acciones terminadas y conocer lo que el agente observó después. | Añade lo que el registro de ediciones no muestra. |
+| Qué agentes compartían tarea, recursos, información o permiso para colaborar | Comparar coordinación permitida con actividad fuera de alcance. | Compartir una página deja de ser la única pista disponible. |
+| Referencias a resultados de herramientas y documentos externos recibidos | Revisar el contexto relevante y, cuando se pueda, el origen de una instrucción o enlace. | No obliga a suponer que una URL publicada fue visitada o que un agente leyó una página. |
+| Casos legítimos y problemáticos con decisiones de referencia revisadas | Medir errores y comparar reglas, detectores y modelos. | Las etiquetas de función de página no se usan como sustituto de autorización de llamadas. |
+
+El encargo, los IDs y los permisos deben proceder del sistema que controla la ejecución. No se acepta como autoridad una justificación creada por el agente. Si se conservan cambios legítimos de tarea o permisos, se registra qué versión estaba vigente para cada llamada.
+
+### 10.2. Cómo se usarían los componentes
+
+1. **Permisos:** escribir las reglas para el encargo y entorno concretos, vinculadas a las guías aplicables. El programa es reutilizable; los permisos no son universales.
+2. **Análisis individual:** aplicar las reglas con memoria a cada trayectoria completa. Si queda un problema sin cubrir, comparar esa base con detección de anomalías calibrada sobre tareas legítimas equivalentes. Su incorporación depende de que mejore los resultados, no de conservar una capa estadística por diseño.
+3. **Análisis colectivo, junto al individual:** observar recursos, objetivos operativos o contenidos compartidos entre IDs. Comparar agentes con tareas y permisos de colaboración conocidos. Una señal colectiva puede existir aunque cada historial individual parezca aceptable.
+4. **Revisión del caso:** reunir las señales individuales y colectivas relevantes junto con la llamada, la tarea y los permisos. Un LLM o clasificador especializado valora si encaja con el encargo, si lo contradice o si falta información. Su decisión no anula restricciones explícitas.
+5. **Respuesta:** permitir, avisar, retener o bloquear según el criterio definido. Registrar la evidencia y la acción realmente tomada. Terminar una ejecución completa requiere una regla específica.
+
+El revisor y el análisis colectivo siguen siendo componentes que deben justificar su utilidad. Tener más datos permite evaluarlos mejor; no los convierte automáticamente en obligatorios. Tampoco obliga a que el juez sea un modelo grande y caro: se comparan candidatos por sus errores, tiempo y recursos, incluidos los casos donde no pueden decidir.
+
+### 10.3. Aplicación propuesta al caso OpenAI/Hugging Face
+
+La posición que nos interesa es la del operador de los agentes, antes de ejecutar sus herramientas. Pediríamos las trayectorias originales y los encargos de las ejecuciones implicadas. Los agregados y muestras de Hugging Face que ya tenemos aportan contexto, pero no sustituyen ese registro del operador.
+
+Por ejemplo, para estudiar el uso de una salida de red permitida, revisaríamos primero qué operación y argumentos estaban autorizados. Después reuniríamos las llamadas de ese ID y, si otros IDs utilizaron el mismo recurso, el patrón colectivo. Solo con la tarea y el contexto necesarios se pediría al modelo que juzgara un caso dudoso. Es un recorrido propuesto, no una afirmación de que tal secuencia esté disponible o de que ya la hayamos detectado.
+
+Si se quisiera relacionar las llamadas con efectos observados en Hugging Face, harían falta referencias o correlaciones justificadas con esos registros externos. Una petición HTTP o un proceso observado por la víctima no equivale automáticamente a una llamada única del agente.
+
+El límite del portero sigue siendo su punto de intervención: puede detener llamadas que pasan por él. Una llamada que lanza código autónomo o accede a otra infraestructura requiere además controles sobre ese entorno. No se asegura que inspeccionar la llamada inicial permita observar cada acción posterior.
+
+### 10.4. Qué haríamos antes de afirmar que funciona en ese caso
+
+Primero comprobaríamos la cobertura de los registros y reproduciríamos las decisiones sobre las llamadas disponibles, declarando los huecos. Compararíamos permisos solos, permisos con memoria y cada añadido individual o colectivo. Para el modelo, mediríamos qué errores corrige y cuáles introduce sobre casos con encargo y decisión de referencia.
+
+Después probaríamos la integración en un entorno controlado donde las llamadas estén realmente pendientes. La reproducción histórica muestra qué habría marcado la política sobre una secuencia fija; una ejecución controlada muestra si el veto funciona y cómo cambia el comportamiento tras recibirlo. Ninguna de las dos, por sí sola, demuestra un contrafactual completo del incidente.
+
+La evaluación incluiría acciones indebidas impedidas, tareas legítimas completadas, bloqueos erróneos, avisos y retenciones, demora hasta la decisión y coste por llamada. Las particiones de preparación y prueba respetarían ejecuciones y grupos relacionados para no evaluar con copias de los mismos casos usados para ajustar el sistema.
+
+**Resultado esperado de esta fase posterior:** evidencia sobre la utilidad de cada componente con información suficiente, incluyendo la posibilidad de concluir que alguno no aporta valor. Si nunca se obtiene ese acceso, la parte A conserva su valor como prueba limitada y reproducible; no se inventan datos para completar la parte B.
+
+## 11. Decisiones cerradas y relato del proyecto
+
+**Cerrado:** implementar ahora la parte A con la wiki y especificar la parte B para después. Capas 1+2 obligatorias y sencillas en el mínimo; 3+4 opcionales. Análisis individual y colectivo al mismo nivel, con señales reunidas para revisión. Nombres como IDs en la wiki y IDs asignados por el ejecutor en el sistema real. Recuperación explícita o exclusión de datos imprescindibles ausentes. Bloqueo por reglas, no por rareza. Evaluación separada de observaciones históricas y llamadas controladas.
+
+**Pendiente de ejecución de la parte A:** seleccionar carga legítima comparable o casos propios, concretar políticas de escenario y presupuestos, consultar las versiones de las guías que se citen al escribir esas reglas, implementar, medir y redactar resultados. La implementación del caso con información completa y el acceso a registros de OpenAI quedan fuera del compromiso del hackathon.
+
+El relato de la entrega sigue este orden: **idea general → datos disponibles y supuestos → método implementado con la wiki → resultados y límites → aplicación posterior con información completa**. Se distingue siempre entre lo que hicimos, lo que asumimos y lo que proponemos hacer después. No se presenta una extensión dibujada como si ya estuviera implementada o evaluada.
+
+Las referencias históricas y el paquete de fuentes se conservan en [el documento del sprint](ai-incident-response-sprint.md). Antes de incluir una afirmación sobre los incidentes en el informe, se comprueba su fuente primaria; los resúmenes previos no sustituyen esa comprobación.

