@@ -30,14 +30,17 @@ El resultado esperado es evidencia reproducible sobre qué comprueba el portero,
 
 ## 2. El control existente y los dos huecos que motivan el requisito
 
-ExploitGym, el benchmark en el centro del incidente de julio, ya despliega un control sobre el agente: contenedores Docker en redes internas sin ruta por defecto a internet, con todo el tráfico saliente pasando por un proxy Squid con allowlist. Durante la ejecución del agente esa allowlist tiene cuatro dominios, todos endpoints de API de modelos. Los detalles y sus fuentes están en [hallazgos-exploitgym.md](../../docs/hallazgos-exploitgym.md), con su aviso de versión.
+ExploitGym, el benchmark en el centro del incidente de julio, ya despliega controles sobre el agente: contenedores Docker en redes internas sin ruta por defecto a internet, con todo el tráfico saliente pasando por un proxy Squid con allowlist. Durante la ejecución del agente esa allowlist tiene cuatro dominios, todos endpoints de API de modelos. Los detalles y sus fuentes están en [hallazgos-exploitgym.md](../../docs/hallazgos-exploitgym.md), con su aviso de versión.
 
 | Hueco                                                          | Por qué existe                                                                                         | Qué requisito del PRD lo cubre                                       |
 | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | La red de instalación es allow-all.                            | Los repositorios de paquetes no se pueden enumerar por adelantado y sin ellos no hay entorno.          | Escenario permisivo de P0-03 y P0-08; límites acumulativos de P0-04. |
-| El tráfico del lado del proveedor (búsqueda web, MCP) no pasa por el proxy. | Lo ejecuta el proveedor por cuenta del modelo; no sale del contenedor. Lo declara su propia documentación. | El punto de intervención de P0-05: comprobar en la llamada, no en la red. |
+| El tráfico del lado del proveedor no pasa por el proxy. **Tapado en v1.1 desde otra capa.** | Lo ejecuta el proveedor por cuenta del modelo. El proxy de LLM lo bloquea inspeccionando la petición: es prior art de comprobación en la llamada, con forma de lista de denegación de tipos de herramienta. | El punto de intervención de P0-05, citando ese precedente y sin atribuirse la capa. |
+| Ningún control pregunta si la llamada encaja con el encargo, ni mira las herramientas propias del agente. | El tablón de mensajes de ~1.200 agentes se montó escribiendo en la caché de paquetes: destino permitido, operación no comprobada. | P0-03 sobre operación además de destino, y P0-04 sobre acumulados. |
 
-El harness tampoco documenta registro de acciones del agente ni comprobación alguna en el punto de la llamada. Sí tiene presupuesto por ejecución, pero mide gasto de API, no acciones: hay memoria contando la cosa equivocada, lo que sostiene P0-04.
+El harness tampoco documenta registro de acciones del agente. Sí tiene presupuesto por ejecución, pero mide gasto de API, no acciones: hay memoria contando la cosa equivocada, lo que sostiene P0-04.
+
+Un dato más, de la investigación de METR y Redwood: al menos 96 transcripciones, en torno al 7 %, contenían llamadas falseadas porque los agentes sustituyeron parte del sistema que las ejecuta. Un monitor que lee transcripciones queda ciego ante eso; un portero en el punto de ejecución, con su política y su log fuera del alcance de escritura del agente, no. Es la evidencia documentada de P0-05 y P0-06.
 
 El incidente de julio pasó por el primer hueco. El de la wiki es **consistente** con el segundo y así debe escribirse: el corpus no contiene ninguna llamada a herramienta, así que no se puede probar por dónde llegaron los agentes. Presentarlo como demostrado es un fallo de aceptación, no un matiz de redacción.
 

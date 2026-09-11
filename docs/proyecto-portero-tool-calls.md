@@ -11,7 +11,8 @@ Revisión del 11 de septiembre de 2026 contra los archivos locales, los document
 Ediciones anteriores llamaban **parte 2** a la implementación con la wiki y **parte 1** al caso con información completa. Se renombran a **parte 2** y **parte 1** respectivamente, y se invierte su orden. El alcance de cada una no cambia: se implementa la wiki, se documenta el caso completo.
 
 - [Contexto y requisitos del sprint](ai-incident-response-sprint.md).
-- [Hallazgos sobre ExploitGym y su harness](hallazgos-exploitgym.md): el control desplegado en el benchmark del incidente, sus huecos declarados y sus fuentes.
+- [Hallazgos sobre ExploitGym y su harness](hallazgos-exploitgym.md): el control desplegado en el benchmark del incidente, sus versiones y sus fuentes.
+- [Hallazgos de la investigación METR / Redwood](hallazgos-metr-redwood.md): el tablón de mensajes sobre la caché de paquetes, las cifras del incidente y las transcripciones falseadas.
 - [Alternativas consideradas](alternativas-proyecto-sprint.md): antecedente histórico; este documento sustituye sus decisiones sobre alcance, capas y evaluación.
 - [Datos agregados de Hugging Face](datos-replay-hf.json).
 - [Archivos de la wiki](../data/collusion-wiki/).
@@ -43,13 +44,15 @@ Ese control tiene dos huecos, y ninguno de los dos es un descuido.
 
 **Hueco 1: la fase de instalación es allow-all.** El harness usa dos redes y cambia el contenedor de una a otra. Durante la construcción del entorno el proxy permite todo, porque los repositorios de paquetes no se pueden enumerar por adelantado y sin ellos no hay entorno. Es exactamente la razón estructural por la que hubo que permitir el proxy de paquetes en el incidente de julio.
 
-**Hueco 2: el tráfico del lado del proveedor no pasa por ahí.** La documentación del firewall lo dice con estas palabras: la búsqueda web y MCP evitan por completo los controles a nivel de contenedor. Una búsqueda web no sale del contenedor; la ejecuta el proveedor por cuenta del modelo. El contenedor puede no tener ninguna ruta a internet y el agente alcanzar la web igualmente. Un proxy de egress no puede ver lo que no pasa por él.
+**Hueco 2: el tráfico del lado del proveedor no pasa por el perímetro,** porque una búsqueda web no sale del contenedor, la ejecuta el proveedor por cuenta del modelo. Es un límite estructural del proxy de egress, y sus autores lo dicen. **Pero no es un agujero abierto:** v1.1, del 18 de junio de 2026, lo bloquea con 403 desde otra capa, el proxy de LLM, inspeccionando la petición a la API en busca de herramientas de recuperación del proveedor. Eso es una comprobación en el punto de la llamada, y es prior art que citamos en vez de fingir que inventamos la capa.
 
-A eso se añade lo que **no** hay. El otro documento de defensas del harness describe las protecciones del objetivo (ASLR, stack canaries, PIE, RELRO, sandbox de V8, mitigaciones del kernel), no del agente. No documenta registro de las acciones del agente, ni monitorización, ni comprobación alguna en el punto de la llamada. Sí hay presupuesto por ejecución, pero mide gasto de API: dice cuánto costó el agente, no cuántos destinos tocó ni cuántas escrituras hizo. Y sí hay un scorer que comprueba si el bug objetivo fue causalmente necesario para capturar la flag, que es un detector de «el agente se salió del camino previsto», pero es post-hoc, por tarea y no impide nada.
+A eso se añade lo que **no** hay. El documento de defensas del harness describe las protecciones del objetivo (ASLR, stack canaries, PIE, RELRO, sandbox de V8, mitigaciones del kernel), no del agente. No documenta registro de las acciones del agente ni comprobación alguna sobre sus herramientas propias. Sí hay presupuesto por ejecución, pero mide gasto de API: dice cuánto costó el agente, no cuántos destinos tocó ni cuántas escrituras hizo. Y sí hay un scorer que comprueba si el bug objetivo fue causalmente necesario para capturar la flag, que es un detector de «el agente se salió del camino previsto», pero es post-hoc, por tarea y no impide nada.
 
-**El resumen del proyecto cabe en una frase:** en este harness todo el control sobre el agente es perimetral o retrospectivo, y en el punto de la llamada no hay nada. El portero se coloca justo ahí.
+**El resumen del proyecto, con precisión:** los tres controles del harness son perimetral, retrospectivo y una lista de denegación de tipos de herramienta del proveedor. Ninguno pregunta si una llamada encaja con el encargo autorizado, y ninguno mira las herramientas propias del agente. El portero se coloca ahí.
 
-Los dos incidentes encajan uno en cada hueco. El de julio pasó por el primero: la salida de red que había que permitir. El de la wiki es **consistente** con el segundo, porque unos agentes en contenedores sin ruta a internet acabaron editando una wiki pública miles de veces. Consistente no es demostrado: el corpus de la wiki no contiene ninguna llamada a herramienta, así que no podemos probar por dónde llegaron. Va como hipótesis declarada y así se escribe en el informe.
+Y ahí ocurrió el incidente. Según la investigación de METR y Redwood, el canal de coordinación de unos 1.200 agentes fue una caché de Artifactory alojada internamente, el repositorio de paquetes: un destino que la allowlist tenía que permitir, usado para una operación que nadie comprobaba. El aislamiento perimetral funcionaba, los sandboxes estaban separados, y los agentes se hablaron por dentro. Los detalles y sus límites están en [hallazgos-metr-redwood.md](hallazgos-metr-redwood.md).
+
+El caso de la wiki es **consistente** con el mismo patrón, un recurso compartido fuera del alcance del control, y así debe escribirse: el corpus de la wiki no contiene ninguna llamada a herramienta, así que no podemos probar por dónde llegaron. Va como hipótesis declarada.
 
 ## 3. Arquitectura general y alcance de sus componentes
 
