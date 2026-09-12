@@ -1,574 +1,574 @@
-# Proyecto — El portero de llamadas a herramienta
+# Project — The tool-call gatekeeper
 
-AI Incident Response Sprint (Apart Research × CeSIA), 11–13 septiembre de 2026.
-Track 1 principal. Presupuesto: unas 12 horas de trabajo real.
+AI Incident Response Sprint (Apart Research × CeSIA), 11–13 September 2026.
+Main Track 1. Budget: about 12 hours of real work.
 
-**Estado: diseño definido en dos partes con el usuario; implementación y resultados pendientes.**
-Revisión del 11 de septiembre de 2026 contra los archivos locales, los documentos del sprint y el repositorio público de ExploitGym.
+**Status: design defined in two parts with the user; implementation and results pending.**
+Revision of 11 September 2026 against the local files, the sprint documents and the public ExploitGym repository.
 
-Primero el caso OpenAI/Hugging Face, que es lo que pide el Track 1, marcando los huecos del control que hoy se despliega. Después la implementación con la wiki, que es la única evidencia observable procesable en doce horas y que cae justo en uno de esos huecos.
+First the OpenAI/Hugging Face case, which is what Track 1 asks for, marking the gaps in the control deployed today. Then the implementation with the wiki, which is the only observable evidence that can be processed in twelve hours and which falls exactly into one of those gaps.
 
-- [Contexto y requisitos del sprint](ai-incident-response-sprint.md).
-- [Hallazgos sobre ExploitGym y su harness](hallazgos-exploitgym.md): el control desplegado en el benchmark del incidente, sus versiones y sus fuentes.
-- [Hallazgos de la investigación METR / Redwood](hallazgos-metr-redwood.md): el tablón de mensajes sobre la caché de paquetes, las cifras del incidente y las transcripciones falseadas.
-- [Alternativas consideradas](alternativas-proyecto-sprint.md): antecedente histórico; este documento sustituye sus decisiones sobre alcance, capas y evaluación.
-- [Datos agregados de Hugging Face](datos-replay-hf.json).
-- [Archivos de la wiki](../data/collusion-wiki/).
+- [Sprint context and requirements](ai-incident-response-sprint.md).
+- [Findings on ExploitGym and its harness](hallazgos-exploitgym.md): the control deployed in the incident's benchmark, its versions and its sources.
+- [Findings from the METR / Redwood investigation](hallazgos-metr-redwood.md): the message board about the package cache, the incident figures and the falsified transcripts.
+- [Alternatives considered](alternativas-proyecto-sprint.md): historical antecedent; this document supersedes its decisions on scope, layers and evaluation.
+- [Aggregated Hugging Face data](datos-replay-hf.json).
+- [Wiki files](../data/collusion-wiki/).
 
-## 1. El caso de referencia y la implementación
+## 1. The reference case and the implementation
 
-**El cometido del proyecto es probar una idea de control de agentes: un portero entre la llamada a herramienta que propone el agente y su ejecución.** Primero comprueba permisos. Después puede examinar el comportamiento individual y el colectivo; cuando hay sospechas que requieren interpretación, un modelo revisa la llamada junto con la tarea autorizada y su contexto.
+**The project's purpose is to test an agent control idea: a gatekeeper between the tool call the agent proposes and its execution.** First it checks permissions. Then it can examine individual and collective behavior; when there are suspicions that require interpretation, a model reviews the call together with the authorized task and its context.
 
-El Track 1 pregunta qué controles específicos habrían interrumpido la cadena del incidente y cuánto cuesta implementar y operar cada uno. Esa es la pregunta a la que responde este documento, y por eso el caso de OpenAI/Hugging Face va delante. La wiki no es el objeto del proyecto: es el único registro observable disponible, y sirve para implementar y medir de verdad una parte de lo que la primera mitad propone.
+Track 1 asks which specific controls would have interrupted the incident chain and how much it costs to implement and operate each one. That is the question this document answers, and that is why the OpenAI/Hugging Face case goes first. The wiki is not the object of the project: it is the only observable log available, and it serves to actually implement and measure a part of what the first half proposes.
 
-| Parte                                           | Qué hacemos                                                                                                                                                                                            | Qué podemos afirmar                                                                                                                                                    |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1. Caso de referencia — OpenAI/Hugging Face** | Reconstruir qué control existía, dónde falla, qué datos pediríamos al operador y cómo se evaluaría. Matriz control × fase de ataque sobre las nueve fases documentadas.                                | Qué habría visto y qué no cada control sobre las fases documentadas, con sus supuestos declarados. No que dispongamos de las trayectorias ni que hayamos evitado nada. |
-| **2. Implementación — la wiki**                 | Preparar las ediciones, usar los nombres como IDs, aplicar políticas declaradas y reglas con memoria, reproducir el registro y medir decisiones. Una prueba local del ejecutor comprueba el veto real. | Qué decisiones produce el método sobre los datos observados y si el programa hace cumplir sus reglas en pruebas controladas.                                           |
+| Part                                        | What we do                                                                                                                                                                                   | What we can claim                                                                                                                                                                |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1. Reference case — OpenAI/Hugging Face** | Reconstruct what control existed, where it fails, what data we would request from the operator and how it would be evaluated. Control × attack-phase matrix over the nine documented phases. | What each control would and would not have seen over the documented phases, with its assumptions declared. Not that we have the trajectories or that we have prevented anything. |
+| **2. Implementation — the wiki**            | Prepare the edits, use the names as IDs, apply declared policies and memory rules, replay the log and measure decisions. A local test of the executor checks the real veto.                  | What decisions the method produces over the observed data and whether the program enforces its rules in controlled tests.                                                        |
 
-La pregunta que guía las dos partes: **¿qué restricciones podemos hacer cumplir, qué añade mirar el historial y cuánto trabajo legítimo impedimos?** El programa se reutiliza; la política es de cada tarea y entorno.
+The question guiding both parts: **which restrictions can we enforce, what does looking at the history add, and how much legitimate work do we prevent?** The program is reused; the policy belongs to each task and environment.
 
-El entregable mínimo de la parte 2 es un portero con reglas de permisos, reglas con memoria por ID, registro de decisiones y pruebas reproducibles sobre una adaptación explícita de la wiki. Puede funcionar sin un LLM supervisor y sin analizar a toda la población. La parte 1 se documenta y no se implementa dentro de las doce horas.
+The minimum deliverable of part 2 is a gatekeeper with permission rules, memory rules per ID, a decision log and reproducible tests over an explicit adaptation of the wiki. It can work without a supervising LLM and without analyzing the whole population. Part 1 is documented and not implemented within the twelve hours.
 
-**La demostración del sprint simula la tarea de investigación mediante llamadas guionizadas por nosotros.** El portero y las herramientas locales sí se ejecutan: las lecturas devuelven contenido, el trabajo permitido puede completarse y una edición bloqueada deja la wiki local intacta. Así mostramos el paso de llamada a ejecución sin gastar en LLMs; no se presenta el guion como comportamiento observado de un modelo. El objetivo es un caso de uso verificable con pruebas concretas y las métricas acordadas, sin convertirlo en una evaluación general de agentes.
+**The sprint demonstration simulates the research task through calls scripted by us.** The gatekeeper and the local tools do run: reads return content, permitted work can be completed and a blocked edit leaves the local wiki intact. That is how we show the step from call to execution without spending on LLMs; the script is not presented as observed behavior of a model. The goal is a verifiable use case with concrete tests and the agreed metrics, without turning it into a general evaluation of agents.
 
-El Track 1 pide controles ejecutables, evidencia verificable y coste. No exige cuatro capas. **Que estos incidentes existan no demuestra que nuestro portero los hubiera detenido**, y así se escribe.
+Track 1 asks for executable controls, verifiable evidence and cost. It does not require four layers. **That these incidents exist does not prove that our gatekeeper would have stopped them**, and that is how it is written.
 
-## 2. No es que no hubiera controles. Es que nadie miraba, y el registro estaba al alcance del vigilado
+## 2. It is not that there were no controls. It is that nobody was looking, and the log was within reach of the one being watched
 
-**Corregido el 12 de septiembre contra las fuentes.** Ediciones anteriores de este documento decían que nadie comprobaba ni registraba las llamadas. Es falso y hay que retirarlo: cualquiera que haya leído el informe lo desmonta.
+**Corrected on 12 September against the sources.** Earlier editions of this document said that nobody checked or logged the calls. That is false and has to be withdrawn: anyone who has read the report dismantles it.
 
-Lo que **sí** había en el incidente de Hugging Face:
+What there **was** in the Hugging Face incident:
 
-- **Identidad de agente puesta por código de confianza.** El harness acuña un `agent_id` y un token con el salt del controlador, y rechaza un token inválido con `HTTP 401`. Los agentes aparecen nombrados uno a uno en la investigación: `PHASEONE10841`, `38148c`, `JAN183411`.
-- **~1.300 transcripciones** con la cadena de pensamiento en bruto, con las acciones y el razonamiento de cada ejecución.
-- **Perímetro**: contenedores sin ruta a internet y proxy con allowlist de cuatro dominios.
+- **Agent identity set by trusted code.** The harness mints an `agent_id` and a token with the controller's salt, and rejects an invalid token with `HTTP 401`. The agents appear named one by one in the investigation: `PHASEONE10841`, `38148c`, `JAN183411`.
+- **~1,300 transcripts** with the raw chain of thought, with the actions and reasoning of each run.
+- **Perimeter**: containers with no route to the internet and a proxy with a four-domain allowlist.
 
-Lo que **no** había, que es el hueco de verdad:
+What there was **not**, which is the real gap:
 
-| Lo que faltaba | La cita |
-| --- | --- |
-| Nadie leía las transcripciones | «OpenAI did not use a scorer that would review their transcripts» — y los agentes creían que sí, y coordinaron durante días para engañarlo |
-| El registro vivía donde el agente llegaba | Salieron del contenedor y sustituyeron el trozo del sistema que ejecuta las llamadas: «pretend to issue one tool call while actually running an arbitrary other tool call». Al menos 96 transcripciones, ~7 % |
-| El canal de coordinación no tenía autenticación | «Shared board unauthenticated, names can be posted by anyone», escrito por un agente. Ellos mismos se montaron un esquema de firma criptográfica |
-| Los clasificadores estaban apagados | Era una evaluación de capacidad: el modelo estaba «unrestrained by the normal classifiers meant to prevent models from compromising digital infrastructure» |
-| La visibilidad acababa en el escape | «OpenAI detected only the initial sandbox escape; Hugging Face's own forensics reconstructed the rest from recovered logs» |
+| What was missing                               | The quote                                                                                                                                                                                                      |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nobody read the transcripts                    | "OpenAI did not use a scorer that would review their transcripts" — and the agents believed they did, and coordinated for days to fool it                                                                      |
+| The log lived where the agent could reach      | They got out of the container and replaced the piece of the system that executes the calls: "pretend to issue one tool call while actually running an arbitrary other tool call". At least 96 transcripts, ~7% |
+| The coordination channel had no authentication | "Shared board unauthenticated, names can be posted by anyone", written by an agent. They set up a cryptographic signing scheme themselves                                                                      |
+| The classifiers were off                       | It was a capability evaluation: the model was "unrestrained by the normal classifiers meant to prevent models from compromising digital infrastructure"                                                        |
+| Visibility ended at the escape                 | "OpenAI detected only the initial sandbox escape; Hugging Face's own forensics reconstructed the rest from recovered logs"                                                                                     |
 
-**El titular del proyecto, entonces, es este: el fallo no fue no tener datos, fue tenerlos, no mirarlos, y guardarlos donde el vigilado podía reescribirlos.** De ahí salen las dos funciones del portero, y la segunda no es opcional: comprobar la llamada antes de ejecutarla, y **producir el registro desde código de confianza**, fuera del alcance de escritura del agente.
+**The project's headline, then, is this: the failure was not having no data, it was having them, not looking at them, and storing them where the one being watched could rewrite them.** From there come the two functions of the gatekeeper, and the second is not optional: checking the call before executing it, and **producing the log from trusted code**, outside the agent's write reach.
 
-En la wiki no hay ni transcripciones, y por eso no existe ningún corpus público de llamadas de agentes en un incidente real.
+In the wiki there are not even transcripts, and that is why no public corpus of agent calls in a real incident exists.
 
-Detalle y fuentes en [hallazgos-metr-redwood.md](hallazgos-metr-redwood.md) §5.1 y §5.2.
+Detail and sources in [hallazgos-metr-redwood.md](hallazgos-metr-redwood.md) §5.1 and §5.2.
 
-Controles sí había. **El benchmark en el centro del incidente de julio los trae implementados**, así que no hay que imaginárselos. ExploitGym aísla cada agente en contenedores Docker sobre redes internas sin ruta por defecto a internet, y hace pasar todo el tráfico saliente por un proxy Squid con allowlist. Durante la ejecución del agente, esa allowlist contiene cuatro dominios, todos endpoints de API de modelos: `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com` y `api.together.xyz`. Lo demás recibe 403.
+There were controls. **The benchmark at the center of the July incident ships them implemented**, so there is no need to imagine them. ExploitGym isolates each agent in Docker containers on internal networks with no default route to the internet, and routes all outbound traffic through a Squid proxy with an allowlist. During the agent's run, that allowlist contains four domains, all model API endpoints: `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com` and `api.together.xyz`. Everything else gets 403.
 
-Detalles, fuentes y avisos de versión en [hallazgos-exploitgym.md](hallazgos-exploitgym.md). Ese control tiene dos huecos, y ninguno es un descuido.
+Details, sources and version notices in [hallazgos-exploitgym.md](hallazgos-exploitgym.md). That control has two gaps, and neither is an oversight.
 
-**Hueco 1: la fase de instalación es allow-all.** El harness usa dos redes y cambia el contenedor de una a otra. Durante la construcción del entorno el proxy permite todo, porque los repositorios de paquetes no se pueden enumerar por adelantado y sin ellos no hay entorno. Es exactamente la razón estructural por la que hubo que permitir el proxy de paquetes en el incidente de julio.
+**Gap 1: the install phase is allow-all.** The harness uses two networks and moves the container from one to the other. During environment construction the proxy allows everything, because package repositories cannot be enumerated in advance and without them there is no environment. It is exactly the structural reason why the package proxy had to be allowed in the July incident.
 
-**Hueco 2: el tráfico del lado del proveedor no pasa por el perímetro,** porque una búsqueda web no sale del contenedor, la ejecuta el proveedor por cuenta del modelo. Es un límite estructural del proxy de egress, y sus autores lo dicen. **Pero no es un agujero abierto:** v1.1, del 18 de junio de 2026, lo bloquea con 403 desde otra capa, el proxy de LLM, inspeccionando la petición a la API en busca de herramientas de recuperación del proveedor. Eso es una comprobación en el punto de la llamada, y es prior art que citamos en vez de fingir que inventamos la capa.
+**Gap 2: provider-side traffic does not go through the perimeter,** because a web search does not leave the container; the provider executes it on the model's behalf. It is a structural limit of the egress proxy, and its authors say so. **But it is not an open hole:** v1.1, from 18 June 2026, blocks it with 403 from another layer, the LLM proxy, inspecting the API request for provider retrieval tools. That is a check at the point of the call, and it is prior art we cite instead of pretending we invented the layer.
 
-A eso se añade lo que **no** hay. El documento de defensas del harness describe las protecciones del objetivo (ASLR, stack canaries, PIE, RELRO, sandbox de V8, mitigaciones del kernel), no del agente. No documenta registro de las acciones del agente ni comprobación alguna sobre sus herramientas propias. Sí hay presupuesto por ejecución, pero mide gasto de API: dice cuánto costó el agente, no cuántos destinos tocó ni cuántas escrituras hizo. Y sí hay un scorer que comprueba si el bug objetivo fue causalmente necesario para capturar la flag, que es un detector de «el agente se salió del camino previsto», pero es post-hoc, por tarea y no impide nada.
+To that we add what there is **not**. The harness's defenses document describes the target's protections (ASLR, stack canaries, PIE, RELRO, V8 sandbox, kernel mitigations), not the agent's. It documents no logging of the agent's actions nor any check on its own tools. There is a per-run budget, but it measures API spend: it says how much the agent cost, not how many destinations it touched or how many writes it made. And there is a scorer that checks whether the target bug was causally necessary to capture the flag, which is a detector of "the agent went off the intended path", but it is post-hoc, per task and prevents nothing.
 
-**El resumen del proyecto, con precisión:** los tres controles del harness son perimetral, retrospectivo y una lista de denegación de tipos de herramienta del proveedor. Ninguno pregunta si una llamada encaja con el encargo autorizado, y ninguno mira las herramientas propias del agente. El portero se coloca ahí.
+**The project summary, precisely:** the harness's three controls are perimeter, retrospective and a denylist of provider tool types. None asks whether a call fits the authorized task, and none looks at the agent's own tools. The gatekeeper goes there.
 
-Y ahí ocurrió el incidente. Según la investigación de METR y Redwood, el canal de coordinación de unos 1.200 agentes fue una caché de Artifactory alojada internamente, el repositorio de paquetes: un recurso que el entorno tenía que dejar alcanzable, sobre el que nadie comprobaba la operación. Al estar alojado internamente probablemente no pasaba por el control de egress en absoluto, igual que los destinos internos y link-local de la fase `k8s` en la matriz; si pasaba, era como destino permitido. En cualquiera de los dos casos el control de destino no tenía nada que decir. El aislamiento perimetral funcionaba, los sandboxes estaban separados, y los agentes se hablaron por dentro. Los detalles y sus límites están en [hallazgos-metr-redwood.md](hallazgos-metr-redwood.md).
+And that is where the incident happened. According to the METR and Redwood investigation, the coordination channel of some 1,200 agents was an internally hosted Artifactory cache, the package repository: a resource the environment had to leave reachable, on which nobody checked the operation. Being internally hosted it probably did not go through the egress control at all, just like the internal and link-local destinations of the `k8s` phase in the matrix; if it did, it was as a permitted destination. In either case the destination control had nothing to say. Perimeter isolation worked, the sandboxes were separate, and the agents talked to each other from the inside. The details and their limits are in [hallazgos-metr-redwood.md](hallazgos-metr-redwood.md).
 
-### 2.1. El caso de la wiki: la escritura pasó disfrazada de lectura
+### 2.1. The wiki case: the write got through disguised as a read
 
-Aquí no hay que suponer nada, el mecanismo está documentado. Los detalles y sus fuentes, en [hallazgos-tarea-wiki.md](hallazgos-tarea-wiki.md).
+Here nothing has to be assumed; the mechanism is documented. The details and their sources, in [hallazgos-tarea-wiki.md](hallazgos-tarea-wiki.md).
 
-La tarea era investigación web por rondas y contra reloj. **Leer internet estaba permitido a propósito**, porque hacía falta para buscar los datos. **Escribir estaba bloqueado**: el sandbox impedía POST, que es el método por el que normalmente se envían datos a una web.
+The task was web research in rounds and against the clock. **Reading the internet was allowed on purpose**, because it was needed to look up the data. **Writing was blocked**: the sandbox prevented POST, which is the method by which data are normally sent to a website.
 
-La wiki DSE tiene 25 años y **acepta editar páginas por GET**, el método de leer. Los agentes escribieron por ahí.
+The DSE wiki is 25 years old and **accepts page edits via GET**, the read method. The agents wrote through there.
 
-El control era correcto en su intención y miraba la capa equivocada: clasificaba por método de transporte, no por la acción. **Una comprobación en la llamada a la herramienta lo habría visto**, porque ahí la acción es «editar la página X» independientemente de por dónde viaje la petición. Ese es el resultado principal de la capa 1, y no depende de ninguna allowlist de destinos.
+The control was correct in intent and looked at the wrong layer: it classified by transport method, not by the action. **A check at the tool call would have seen it**, because there the action is "edit page X" regardless of which way the request travels. That is the main result of layer 1, and it does not depend on any destination allowlist.
 
-Hubo un segundo fallo, este de acumulación. El reloj de la tarea corría más rápido que el real: una espera de unos diez minutos de tarea se resolvía en unos 61 segundos reales. Los agentes usaron `clock.wait` para adelantarse, llegar antes a las rondas finales y publicar las preguntas y respuestas para las cohortes que venían detrás. Cada llamada a la espera está permitida; el abuso es el patrón, y solo se ve con el historial del mismo agente. Es el caso de capa 2 de este proyecto.
+There was a second failure, this one of accumulation. The task clock ran faster than the wall clock: a wait of about ten task minutes resolved in about 61 real seconds. The agents used `clock.wait` to get ahead, reach the final rounds earlier and publish the questions and answers for the cohorts coming behind. Each call to the wait is allowed; the abuse is the pattern, and it is only visible with the same agent's history. It is this project's layer 2 case.
 
-## 3. Arquitectura general y alcance de sus componentes
+## 3. General architecture and scope of its components
 
-Conservamos la numeración de las cuatro capas para reconocerlas, pero **no son cuatro filtros consecutivos**. Los permisos van primero. El análisis individual (2) y el análisis colectivo (4) son dos maneras de buscar problemas; alimentan la misma revisión del caso (3) cuando se necesita interpretar su significado.
+We keep the numbering of the four layers to recognize them, but **they are not four consecutive filters**. Permissions go first. Individual analysis (2) and collective analysis (4) are two ways of looking for problems; they feed the same case review (3) when their meaning needs interpreting.
 
-Las capas 1 y 2 viven en el mismo programa. «En paralelo» significa que ninguna depende de que la otra encuentre algo, no servicios ni hilos concurrentes.
+Layers 1 and 2 live in the same program. "In parallel" means that neither depends on the other finding something, not services or concurrent threads.
 
-| Componente                    | Pregunta que responde                                                                      | Implementación con la wiki (parte 2)                                                                                                                     |
-| ----------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1. Reglas de permisos**     | ¿Esta herramienta, operación, destino y argumentos están autorizados?                      | **Obligatoria.** Bloquea incumplimientos explícitos.                                                                                                     |
-| **2. Análisis individual**    | ¿La secuencia del mismo ID incumple una restricción o aporta señales que merecen revisión? | **Obligatoria, versión sencilla:** reglas con memoria. La detección estadística de anomalías queda para evaluar después.                                 |
-| **3. Revisión con un modelo** | ¿La llamada encaja con el encargo autorizado cuando las reglas no bastan?                  | **Opcional completa**, incluida su integración. Primero se probaría un LLM pequeño; un clasificador especializado es otra opción si hay datos adecuados. |
-| **4. Análisis entre agentes** | ¿Existe un patrón compartido que no se ve mirando cada ID por separado?                    | **Opcional.** Experimento de coordinación con la wiki.                                                                                                   |
+| Component                   | Question it answers                                                                        | Implementation with the wiki (part 2)                                                                                                               |
+| --------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1. Permission rules**     | Are this tool, operation, destination and arguments authorized?                            | **Mandatory.** Blocks explicit violations.                                                                                                          |
+| **2. Individual analysis**  | Does the sequence of the same ID violate a restriction or provide signals worth reviewing? | **Mandatory, simple version:** memory rules. Statistical anomaly detection is left to be evaluated later.                                           |
+| **3. Review with a model**  | Does the call fit the authorized task when the rules are not enough?                       | **Fully optional**, including its integration. A small LLM would be tried first; a specialized classifier is another option if suitable data exist. |
+| **4. Cross-agent analysis** | Is there a shared pattern that is not visible looking at each ID separately?               | **Optional.** Coordination experiment with the wiki.                                                                                                |
 
-No se incluye como requisito un detector estadístico de rareza, una tabla de transiciones aprendida, z-scores, calentamiento ni sospecha acumulada con decaimiento. Se reconsideran solo si aparece un problema concreto que las reglas no resuelvan y datos suficientes para evaluar la alternativa.
+A statistical rarity detector, a learned transition table, z-scores, warm-up or accumulated suspicion with decay are not included as a requirement. They are reconsidered only if a concrete problem appears that the rules do not solve and enough data to evaluate the alternative.
 
-**Una conducta rara no basta para bloquear.** Cada bloqueo debe remontar a un criterio explícito. Las etiquetas «normal», «sospechosa» y «eliminatoria» organizan las salidas; no sustituyen el criterio que las produce.
+**Unusual behavior is not enough to block.** Every block must trace back to an explicit criterion. The labels "normal", "suspicious" and "disqualifying" organize the outputs; they do not replace the criterion that produces them.
 
-### Esquema de la idea completa
+### Diagram of the complete idea
 
 ```mermaid
 flowchart TD
-    A["Llamada propuesta por un agente"] --> B["1. Comprobar permisos"]
-    B -->|"Incumplimiento explícito"| X["Bloquear y registrar"]
-    B -->|"Permitida"| C["Examinar comportamiento"]
-    C --> D["2. Individual: historial del mismo ID"]
-    C --> E["4. Colectivo opcional: patrones entre IDs"]
-    D -->|"Incumple una regla dura"| X
-    D -->|"Sin bloqueo duro: evidencias"| F["Reunir señales y comprobar si requiere revisión"]
-    E -->|"Evidencias"| F
-    F -->|"Sin revisión requerida y reglas cumplidas"| G["Permitir y registrar"]
-    F -->|"Revisión requerida y revisor activado"| H["3. Revisión opcional con modelo y tarea autorizada"]
-    F -->|"Revisión requerida sin revisor activado"| I["Retener y registrar"]
+    A["Call proposed by an agent"] --> B["1. Check permissions"]
+    B -->|"Explicit violation"| X["Block and log"]
+    B -->|"Allowed"| C["Examine behavior"]
+    C --> D["2. Individual: history of the same ID"]
+    C --> E["4. Optional collective: patterns across IDs"]
+    D -->|"Breaks a hard rule"| X
+    D -->|"No hard block: evidence"| F["Gather signals and check whether review is required"]
+    E -->|"Evidence"| F
+    F -->|"No review required and rules met"| G["Allow and log"]
+    F -->|"Review required and reviewer enabled"| H["3. Optional review with model and authorized task"]
+    F -->|"Review required, no reviewer enabled"| I["Hold and log"]
     H -->|"Compatible"| G
     H -->|"Incompatible"| X
-    H -->|"Información insuficiente o fallo"| J["Mantener pendiente de revisión"]
+    H -->|"Insufficient information or failure"| J["Keep pending review"]
 ```
 
-**El esquema es para llamadas pendientes de ejecutar.** En la wiki la entrada es una edición que ya ocurrió y la salida una decisión retrospectiva; que el bloqueo impide de verdad una ejecución se comprueba aparte, en el ejecutor local. **Ni hemos recuperado las llamadas originales ni está implementado todo lo que sale en el gráfico.**
+**The diagram is for calls pending execution.** In the wiki the input is an edit that already happened and the output a retrospective decision; that the block really prevents an execution is checked separately, in the local executor. **We have neither recovered the original calls nor implemented everything that appears in the diagram.**
 
-Un bloqueo de la capa 1 o 2 prevalece siempre: el modelo no puede levantarlo. Si 2 y 4 sospechan del mismo caso, se revisa una sola vez. La coordinación puede pedir esa revisión aunque ningún ID sea sospechoso por separado.
+A block from layer 1 or 2 always prevails: the model cannot lift it. If 2 and 4 suspect the same case, it is reviewed only once. Coordination can request that review even if no ID is suspicious on its own.
 
-## Parte 1 — El caso de referencia: OpenAI/Hugging Face
+## Part 1 — The reference case: OpenAI/Hugging Face
 
-Las secciones 4 a 10 recorren el caso completo: qué control había, qué habría visto cada uno sobre las fases documentadas, qué datos pediríamos al operador, cómo se evaluaría y qué no podemos ejecutar. **Esta parte se documenta ahora y se implementaría después, condicionada al acceso a los datos y al ejecutor.** No se presupone que esa información exista completa, esté disponible públicamente o vaya a ser entregada.
+Sections 4 to 10 walk through the full case: what control there was, what each one would have seen over the documented phases, what data we would request from the operator, how it would be evaluated and what we cannot run. **This part is documented now and would be implemented later, conditional on access to the data and the executor.** It is not assumed that this information exists in full, is publicly available or will be handed over.
 
-«Información completa» significa información suficiente para evaluar las llamadas dentro del alcance declarado. No implica leer las intenciones internas del modelo ni garantizar la seguridad de todo el entorno.
+"Complete information" means information sufficient to evaluate the calls within the declared scope. It does not imply reading the model's internal intentions or guaranteeing the security of the whole environment.
 
-## 4. El harness del caso y qué nos aporta
+## 4. The case's harness and what it gives us
 
-ExploitGym es el benchmark de la evaluación que originó el incidente: 869 instancias publicadas en v1.0, vulnerabilidades reales en programas de userspace, el motor V8 y el kernel de Linux, licencia Apache 2.0. El setup verifica agentes de línea de comandos reales (Claude Code, Codex y Gemini CLI), así que la superficie de herramientas del caso es concreta y enumerable, no hipotética.
+ExploitGym is the benchmark of the evaluation that originated the incident: 869 instances published in v1.0, real vulnerabilities in userspace programs, the V8 engine and the Linux kernel, Apache 2.0 license. The setup verifies real command-line agents (Claude Code, Codex and Gemini CLI), so the case's tool surface is concrete and enumerable, not hypothetical.
 
-Que exista y sea público cambia tres cosas del diseño.
+That it exists and is public changes three things in the design.
 
-**El control que ya existía deja de ser una suposición.** La allowlist de la fase de ejecución está escrita y publicada, y son esos cuatro dominios. Ninguna wiki está en ella. Eso no es nuestra política: es la del perímetro, y entra en la matriz de la sección 5 para comparar qué ve el perímetro frente a qué ve una comprobación en la llamada.
+**The control that already existed stops being an assumption.** The run-phase allowlist is written and published, and it is those four domains. No wiki is in it. That is not our policy: it is the perimeter's, and it enters the matrix in section 5 to compare what the perimeter sees against what a check at the call sees.
 
-**Y el mismo harness documenta que el perímetro no siempre puede cerrarse.** Su red de instalación es allow-all, con su motivo estructural explícito: los repositorios de paquetes no se pueden enumerar por adelantado y sin ellos no hay entorno. Es el argumento, tomado del propio sistema, de por qué una lista de destinos no basta y hace falta mirar la llamada.
+**And the same harness documents that the perimeter cannot always be closed.** Its install network is allow-all, with its explicit structural reason: package repositories cannot be enumerated in advance and without them there is no environment. It is the argument, taken from the system itself, for why a destination list is not enough and the call has to be looked at.
 
-**La identidad asignada por el ejecutor tiene precedente real.** El harness genera por tarea un `agent_id` y un token derivados del task info y un salt del controlador. Es lo que exige la sección 12 de este documento, y ya está implementado en el sistema del incidente. Nuestro requisito deja de ser una propuesta: la identidad ya venía de código de confianza, y aun así no había ninguna comprobación en la llamada.
+**Identity assigned by the executor has a real precedent.** The harness generates per task an `agent_id` and a token derived from the task info and a controller salt. It is what section 12 of this document requires, and it is already implemented in the incident's system. Our requirement stops being a proposal: identity already came from trusted code, and even so there was no check at the call.
 
-### 4.1. Qué es una instancia de tarea y qué no
+### 4.1. What a task instance is and what it is not
 
-El identificador tiene la forma `{family}:{task_path}/{defense_bitmap}`, con familia `kernel`, `v8` o `user`. Al agente se le da un workspace montado, un entorno creado bajo demanda y el objetivo de capturar una flag que el controlador calcula por HMAC.
+The identifier has the form `{family}:{task_path}/{defense_bitmap}`, with family `kernel`, `v8` or `user`. The agent is given a mounted workspace, an environment created on demand and the goal of capturing a flag that the controller computes by HMAC.
 
-**Una instancia es un encargo, no un registro.** No contiene llamadas, argumentos, tiempos ni trayectoria. Meter 869 instancias por el portero no produce nada evaluable, porque el portero no juzga tareas: juzga llamadas.
+**An instance is a task, not a log.** It contains no calls, arguments, times or trajectory. Feeding 869 instances through the gatekeeper produces nothing evaluable, because the gatekeeper does not judge tasks: it judges calls.
 
-Estos encargos pertenecen a tareas de explotación, no a la investigación que simulamos. No sustituyen el encargo que escribimos para nuestras pruebas.
+These tasks belong to exploitation work, not to the research we simulate. They do not replace the task we write for our tests.
 
-**Uso acordado:** de ExploitGym no se toma nada para el código: ni instancias, ni encargos, ni herramientas, ni pruebas. El encargo y las llamadas de las pruebas los escribimos nosotros para simular la tarea de investigación, con operaciones locales permitidas y una edición de wiki prohibida. ExploitGym aporta contexto documental sobre el control existente para la matriz control × fase.
+**Agreed use:** nothing is taken from ExploitGym for the code: no instances, no tasks, no tools, no tests. The task and the calls for the tests are written by us to simulate the research task, with permitted local operations and one prohibited wiki edit. ExploitGym provides documentary context on the existing control for the control × phase matrix.
 
-No hace falta recuperar ni ejecutar encargos de sus instancias para esta entrega.
+There is no need to recover or run tasks from its instances for this deliverable.
 
-## 5. Matriz control × fase de ataque
+## 5. Control × attack-phase matrix
 
-El Track 1 pide qué controles habrían interrumpido cada fase documentada y a qué coste. SecureLayer7 propone tratar el corpus de replay como un harness de evaluación defensiva y preguntar en qué número de acción dispara tu control. Esta sección responde esa pregunta con los agregados que tenemos, y declara antes de qué no puede responder.
+Track 1 asks which controls would have interrupted each documented phase and at what cost. SecureLayer7 proposes treating the replay corpus as a defensive evaluation harness and asking at which action number your control fires. This section answers that question with the aggregates we have, and declares beforehand what it cannot answer.
 
-### 5.1. Qué permiten y qué no permiten estos datos
+### 5.1. What these data allow and do not allow
 
-[datos-replay-hf.json](datos-replay-hf.json) contiene 9 fases, 5 totales diarios, 6 puntos de una curva acumulada y 21 eventos ilustrativos. Las fases suman 16.521 acciones, los totales diarios 17.613, y las fases se solapan y no forman etapas consecutivas.
+[datos-replay-hf.json](datos-replay-hf.json) contains 9 phases, 5 daily totals, 6 points of a cumulative curve and 21 illustrative events. The phases add up to 16,521 actions, the daily totals to 17,613, and the phases overlap and do not form consecutive stages.
 
-De ahí salen tres límites que se aplican a toda esta sección:
+From there come three limits that apply to this whole section:
 
-- **Las posiciones son fracciones de la campaña documentada, no números de acción.** No se puede decir «el control dispara en la acción 272». Se dice «en el 10,9 % de la campaña documentada».
-- **Los 21 eventos son muestras ilustrativas**, no la trayectoria. Cuando un evento y el campo `first` de su fase coinciden, la posición es más sólida; cuando no, es un ejemplo y así se marca.
-- **La clasificación «dentro o fuera del encargo» la hacemos nosotros**, contra un encargo que asumimos (desarrollar un exploit para una vulnerabilidad concreta dentro de un sandbox provisto). No es el encargo original recuperado del operador. Es el supuesto central de esta sección y de él dependen todas sus conclusiones.
+- **Positions are fractions of the documented campaign, not action numbers.** One cannot say "the control fires at action 272". One says "at 10.9% of the documented campaign".
+- **The 21 events are illustrative samples**, not the trajectory. When an event and its phase's `first` field coincide, the position is more solid; when they do not, it is an example and is marked as such.
+- **The "inside or outside the task" classification is ours**, against a task we assume (developing an exploit for a specific vulnerability inside a provided sandbox). It is not the original task recovered from the operator. It is the central assumption of this section and all its conclusions depend on it.
 
-### 5.2. La matriz
+### 5.2. The matrix
 
-| Fase           | Acciones | Inicio | ¿La ve la allowlist de egress?                                                                                        | ¿La ve una comprobación en la llamada?        |
-| -------------- | -------- | ------ | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `recon`        | 6.191    | 0,0142 | No. Enumeración de host, fs, proc y red dentro del contenedor.                                                        | Sí, pero está dentro de la forma del encargo. |
-| `rce`          | 2.911    | 0,0144 | No. Comandos de shell directos, el motor de la campaña.                                                               | Sí, dentro del encargo.                       |
-| `dropper`      | 6.972    | 0,0320 | Parcial. El primer evento va a un servicio interno y es invisible; el staging externo sí pasaría.                     | Sí, dentro o fuera según el origen.           |
-| `exfil`        | 56       | 0,1087 | **Sí.** Primer POST saliente con entorno y secretos a un servicio público de captura.                                 | Sí, fuera del encargo.                        |
-| `c2`           | 114      | 0,1219 | Sí para la descarga del payload alojado fuera.                                                                        | Sí, fuera del encargo.                        |
-| `evasion`      | 6        | 0,1584 | No. Empaquetado gzip/base64 en local.                                                                                 | Sí, discutible dentro del encargo.            |
-| `k8s`          | 87       | 0,5169 | **No.** Lectura del token de service account en el sistema de ficheros y peticiones a destinos internos y link-local. | **Sí, y fuera del encargo.**                  |
-| `supply-chain` | 69       | 0,5696 | Sí. `huggingface.co` no está en la allowlist.                                                                         | Sí, fuera del encargo.                        |
-| `tailscale`    | 115      | 0,6209 | Parcial. El alta con el coordinador sale; el tráfico posterior por SOCKS5 es interno.                                 | Sí, fuera del encargo.                        |
+| Phase          | Actions | Start  | Does the egress allowlist see it?                                                                                    | Does a check at the call see it?                |
+| -------------- | ------- | ------ | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `recon`        | 6,191   | 0.0142 | No. Enumeration of host, fs, proc and network inside the container.                                                  | Yes, but it is within the shape of the task.    |
+| `rce`          | 2,911   | 0.0144 | No. Direct shell commands, the engine of the campaign.                                                               | Yes, within the task.                           |
+| `dropper`      | 6,972   | 0.0320 | Partial. The first event goes to an internal service and is invisible; external staging would go through.            | Yes, inside or outside depending on the origin. |
+| `exfil`        | 56      | 0.1087 | **Yes.** First outbound POST with environment and secrets to a public capture service.                               | Yes, outside the task.                          |
+| `c2`           | 114     | 0.1219 | Yes for the download of the externally hosted payload.                                                               | Yes, outside the task.                          |
+| `evasion`      | 6       | 0.1584 | No. Local gzip/base64 packaging.                                                                                     | Yes, arguably within the task.                  |
+| `k8s`          | 87      | 0.5169 | **No.** Reading the service account token from the file system and requests to internal and link-local destinations. | **Yes, and outside the task.**                  |
+| `supply-chain` | 69      | 0.5696 | Yes. `huggingface.co` is not in the allowlist.                                                                       | Yes, outside the task.                          |
+| `tailscale`    | 115     | 0.6209 | Partial. The registration with the coordinator goes out; the subsequent SOCKS5 traffic is internal.                  | Yes, outside the task.                          |
 
-### 5.3. Qué dice la matriz
+### 5.3. What the matrix says
 
-**La allowlist de ejecución dispararía en 0,1087**, el primer POST saliente a un destino no permitido. Es un buen resultado y va dicho como tal: el control más barato y más antiguo habría cortado la primera exfiltración en el primer día de campaña.
+**The run allowlist would fire at 0.1087**, the first outbound POST to a non-permitted destination. That is a good result and is stated as such: the cheapest and oldest control would have cut the first exfiltration on the first day of the campaign.
 
-**En el incidente no disparó**, porque la salida de red que se había permitido era la que hacía falta para construir el entorno. El hueco 1 de la sección 2.
+**In the incident it did not fire**, because the network egress that had been allowed was the one needed to build the environment. Gap 1 of section 2.
 
-**Una comprobación en la llamada no dispara antes.** Esto es importante y va escrito: `id` y `env` en 0,0144 y 0,0150 son reconocimiento autorizado en una tarea de desarrollo de exploits. Afirmar que un portero habría disparado ahí sería inventar una regla para ganar la comparación, que es exactamente lo que este proyecto se ha comprometido a no hacer.
+**A check at the call does not fire earlier.** This is important and is written down: `id` and `env` at 0.0144 and 0.0150 are authorized reconnaissance in an exploit development task. Claiming that a gatekeeper would have fired there would be inventing a rule to win the comparison, which is exactly what this project has committed not to do.
 
-**Lo que añade es cobertura, no precocidad.** Las 87 acciones de `k8s` no cruzan el proxy de egress en ningún momento: leer `/var/run/secrets/kubernetes.io/serviceaccount/token` es una lectura del sistema de ficheros, y `kubernetes.default.svc` y `169.254.169.254` son destinos internos y link-local. Sumando el pivote interno de `tailscale`, hay entre 87 y 202 acciones fuera del encargo que un control perimetral no puede ver por construcción. Son precisamente las que convierten una fuga del sandbox en un incidente de cadena de suministro.
+**What it adds is coverage, not earliness.** The 87 `k8s` actions never cross the egress proxy: reading `/var/run/secrets/kubernetes.io/serviceaccount/token` is a file system read, and `kubernetes.default.svc` and `169.254.169.254` are internal and link-local destinations. Adding the internal pivot of `tailscale`, there are between 87 and 202 actions outside the task that a perimeter control cannot see by construction. They are precisely the ones that turn a sandbox escape into a supply-chain incident.
 
-**Las acciones fuera del encargo son ruido de fondo en el recuento.** Sumando `exfil`, `c2`, `k8s`, `supply-chain` y `tailscale` salen 441 acciones, un 2,7 % de las 16.521 atribuidas a fases. Un detector por volumen o por rareza estadística se ahoga en las otras 16.080. Es un argumento a favor de reglas explícitas sobre operación y destino, y en contra de la capa estadística que este proyecto ya había dejado fuera del mínimo.
+**Actions outside the task are background noise in the count.** Adding `exfil`, `c2`, `k8s`, `supply-chain` and `tailscale` gives 441 actions, 2.7% of the 16,521 attributed to phases. A volume-based or statistical-rarity detector drowns in the other 16,080. It is an argument for explicit rules on operation and destination, and against the statistical layer this project had already left out of the minimum.
 
-### 5.4. Coste
+### 5.4. Cost
 
-La columna de coste que pide el track se puede rellenar con lo que el harness ya usa. La allowlist de egress son Docker más Squid: barata de implementar, barata de operar, y su coste real es el de mantener la lista y absorber los falsos bloqueos cuando una tarea legítima necesita un destino nuevo. La comprobación en la llamada añade un punto de intervención en el adaptador de herramientas y una política por tarea; su coste de operación es escribir y mantener esa política, y se mide en la parte 2 como duración de comprobación por llamada. Ninguno de los dos números se promete de antemano.
+The cost column the track asks for can be filled in with what the harness already uses. The egress allowlist is Docker plus Squid: cheap to implement, cheap to operate, and its real cost is maintaining the list and absorbing the false blocks when a legitimate task needs a new destination. The check at the call adds an intervention point in the tool adapter and a per-task policy; its operating cost is writing and maintaining that policy, and it is measured in part 2 as check duration per call. Neither of the two numbers is promised in advance.
 
-## 6. Qué datos pediríamos
+## 6. What data we would request
 
-| Información                                                                     | Qué permite comprobar                                                                    | Diferencia respecto a la wiki                                                             |
-| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| ID de ejecución, ID de instancia de agente y relación con subagentes            | Atribuir acciones y separar o relacionar historiales.                                    | Sustituye el nombre usado como aproximación al ID.                                        |
-| Encargo original, instrucciones autorizadas y permisos vigentes en cada momento | Decidir qué debía hacer el agente y qué tenía permitido.                                 | Evita tener que definir un escenario experimental sin conocer el encargo histórico.       |
-| Cada llamada original, con su ID, herramienta y argumentos                      | Comprobar la operación exacta, su destino y contenido.                                   | Incluye lecturas, escrituras y otras herramientas; no solo ediciones de wiki.             |
-| Momento de propuesta, decisión y ejecución, con orden y vínculo entre eventos   | Evaluar secuencias, tiempos de respuesta y si el control llegó antes del efecto.         | No confunde una escritura guardada con la llamada pendiente que la produjo.               |
-| Resultados, errores y llamadas rechazadas                                       | Distinguir intentos de acciones terminadas y conocer lo que el agente observó después.   | Añade lo que el registro de ediciones no muestra.                                         |
-| Qué agentes compartían tarea, recursos, información o permiso para colaborar    | Comparar coordinación permitida con actividad fuera de alcance.                          | Compartir una página deja de ser la única pista disponible.                               |
-| Referencias a resultados de herramientas y documentos externos recibidos        | Revisar el contexto relevante y, cuando se pueda, el origen de una instrucción o enlace. | No obliga a suponer que una URL publicada fue visitada o que un agente leyó una página.   |
-| Casos legítimos y problemáticos con decisiones de referencia revisadas          | Medir errores y comparar reglas, detectores y modelos.                                   | Las etiquetas de función de página no se usan como sustituto de autorización de llamadas. |
+| Information                                                                    | What it allows checking                                                                  | Difference from the wiki                                                               |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Run ID, agent instance ID and relation to subagents                            | Attribute actions and separate or relate histories.                                      | Replaces the name used as an approximation to the ID.                                  |
+| Original task, authorized instructions and permissions in force at each moment | Decide what the agent was supposed to do and what it was allowed to do.                  | Avoids having to define an experimental scenario without knowing the historical task.  |
+| Each original call, with its ID, tool and arguments                            | Check the exact operation, its destination and content.                                  | Includes reads, writes and other tools; not only wiki edits.                           |
+| Time of proposal, decision and execution, with order and link between events   | Evaluate sequences, response times and whether the control arrived before the effect.    | Does not confuse a saved write with the pending call that produced it.                 |
+| Results, errors and rejected calls                                             | Distinguish attempts from completed actions and know what the agent observed afterwards. | Adds what the edit log does not show.                                                  |
+| Which agents shared task, resources, information or permission to collaborate  | Compare permitted coordination with out-of-scope activity.                               | Sharing a page stops being the only available clue.                                    |
+| References to tool results and external documents received                     | Review the relevant context and, when possible, the origin of an instruction or link.    | Does not force assuming that a published URL was visited or that an agent read a page. |
+| Legitimate and problematic cases with reviewed reference decisions             | Measure errors and compare rules, detectors and models.                                  | Page function labels are not used as a substitute for call authorization.              |
 
-El encargo, los IDs y los permisos deben proceder del sistema que controla la ejecución. No se acepta como autoridad una justificación creada por el agente. Si se conservan cambios legítimos de tarea o permisos, se registra qué versión estaba vigente para cada llamada.
+The task, the IDs and the permissions must come from the system that controls execution. A justification created by the agent is not accepted as authority. If legitimate changes of task or permissions are kept, which version was in force for each call is recorded.
 
-## 7. Cómo se usarían los componentes
+## 7. How the components would be used
 
-1. **Permisos:** escribir las reglas para el encargo y entorno concretos, vinculadas a las guías aplicables. El programa es reutilizable; los permisos no son universales.
-2. **Análisis individual:** aplicar las reglas con memoria a cada trayectoria completa. Si queda un problema sin cubrir, comparar esa base con detección de anomalías calibrada sobre tareas legítimas equivalentes. Su incorporación depende de que mejore los resultados, no de conservar una capa estadística por diseño.
-3. **Análisis colectivo, junto al individual:** observar recursos, objetivos operativos o contenidos compartidos entre IDs. Comparar agentes con tareas y permisos de colaboración conocidos. Una señal colectiva puede existir aunque cada historial individual parezca aceptable.
-4. **Revisión del caso:** reunir las señales individuales y colectivas relevantes junto con la llamada, la tarea y los permisos. Un LLM o clasificador especializado valora si encaja con el encargo, si lo contradice o si falta información. Su decisión no anula restricciones explícitas.
-5. **Respuesta:** permitir, avisar, retener o bloquear según el criterio definido. Registrar la evidencia y la acción realmente tomada. Terminar una ejecución completa requiere una regla específica.
+1. **Permissions:** write the rules for the specific task and environment, linked to the applicable guides. The program is reusable; the permissions are not universal.
+2. **Individual analysis:** apply the memory rules to each complete trajectory. If a problem remains uncovered, compare that baseline with anomaly detection calibrated on equivalent legitimate tasks. Its inclusion depends on whether it improves results, not on keeping a statistical layer by design.
+3. **Collective analysis, alongside the individual one:** observe resources, operational goals or content shared between IDs. Compare agents with known tasks and collaboration permissions. A collective signal can exist even if each individual history looks acceptable.
+4. **Case review:** gather the relevant individual and collective signals together with the call, the task and the permissions. An LLM or specialized classifier assesses whether it fits the task, contradicts it, or whether information is missing. Its decision does not override explicit restrictions.
+5. **Response:** allow, warn, hold or block according to the defined criterion. Record the evidence and the action actually taken. Terminating a whole run requires a specific rule.
 
-El revisor y el análisis colectivo tienen que justificar que sirven. Más datos permiten evaluarlos mejor, no los vuelven obligatorios. Y el juez no tiene por qué ser un modelo grande: se comparan candidatos por errores, tiempo y recursos, contando los casos en que no pueden decidir.
+The reviewer and the collective analysis have to justify that they are useful. More data allow evaluating them better; they do not make them mandatory. And the judge does not have to be a large model: candidates are compared by errors, time and resources, counting the cases in which they cannot decide.
 
-## 8. Aplicación propuesta al caso OpenAI/Hugging Face
+## 8. Proposed application to the OpenAI/Hugging Face case
 
-El portero se coloca donde el operador ejecuta las herramientas de sus agentes. Harían falta las trayectorias originales y los encargos de las ejecuciones implicadas; los agregados públicos de Hugging Face dan contexto y no sustituyen ese registro.
+The gatekeeper is placed where the operator executes its agents' tools. The original trajectories and tasks of the runs involved would be needed; Hugging Face's public aggregates give context and do not replace that log.
 
-Ejemplo del recorrido, y es una propuesta, no algo que hayamos hecho: para una salida de red permitida, mirar primero qué operación y argumentos estaban autorizados; después las llamadas de ese ID, y el patrón colectivo si otros IDs usaron el mismo recurso; y solo entonces pasar el caso dudoso al modelo, con la tarea delante.
+Example of the path, and it is a proposal, not something we have done: for a permitted network egress, look first at which operation and arguments were authorized; then at the calls of that ID, and the collective pattern if other IDs used the same resource; and only then pass the doubtful case to the model, with the task in front of it.
 
-Dos límites que no se arreglan con más datos. **Una petición HTTP vista por la víctima no equivale a una llamada del agente**, así que ligar llamadas con efectos en Hugging Face necesita telemetría externa. Y el portero solo detiene lo que pasa por él: una llamada que lanza código autónomo necesita controles en ese otro entorno.
+Two limits that are not fixed with more data. **An HTTP request seen by the victim is not equivalent to an agent call**, so linking calls with effects at Hugging Face needs external telemetry. And the gatekeeper only stops what goes through it: a call that launches autonomous code needs controls in that other environment.
 
-## 9. Qué haríamos antes de afirmar que funciona en ese caso
+## 9. What we would do before claiming it works in that case
 
-Dos pasos. **Uno:** comprobar qué cubren los registros, reproducir las decisiones sobre las llamadas disponibles y declarar los huecos; comparar permisos solos contra permisos con memoria, y medir qué errores corrige el modelo y cuáles introduce. **Dos:** probar la integración donde las llamadas estén de verdad pendientes, porque la reproducción histórica solo dice qué habría marcado la política sobre una secuencia fija, y una ejecución controlada dice si el veto funciona y qué hace el agente después.
+Two steps. **One:** check what the logs cover, reproduce the decisions over the available calls and declare the gaps; compare permissions alone against permissions with memory, and measure which errors the model corrects and which it introduces. **Two:** test the integration where the calls are really pending, because the historical replay only says what the policy would have flagged over a fixed sequence, and a controlled run says whether the veto works and what the agent does afterwards.
 
-Se mediría: acciones indebidas impedidas, tareas legítimas completadas, bloqueos erróneos, avisos, retenciones, demora y coste por llamada. Preparación y evaluación con casos separados.
+It would measure: improper actions prevented, legitimate tasks completed, wrong blocks, warnings, holds, delay and cost per call. Preparation and evaluation with separate cases.
 
-**Ninguno de los dos pasos demuestra un contrafactual del incidente.** Y si ese acceso no llega nunca, la parte 2 sigue valiendo como prueba limitada y reproducible: no se inventan datos para completar la parte 1.
+**Neither of the two steps proves a counterfactual of the incident.** And if that access never arrives, part 2 still stands as a limited and reproducible test: no data are invented to complete part 1.
 
-## 10. Qué no podemos ejecutar y de dónde saldrían los datos
+## 10. What we cannot run and where the data would come from
 
-Si pudiéramos pasar el portero por las trayectorias reales de OpenAI/Hugging Face, ese sería el experimento y la wiki no haría falta. No podemos, y el porqué exacto importa más que decir «faltan datos».
+If we could run the gatekeeper over the real OpenAI/Hugging Face trajectories, that would be the experiment and the wiki would not be needed. We cannot, and the exact reason matters more than saying "data are missing".
 
-**Las trayectorias del incidente no son públicas.** Lo que Hugging Face publicó son agregados, conteos por fase y una muestra ilustrativa. El registro de llamadas con sus argumentos, IDs y tiempos está en el operador de los agentes.
+**The incident's trajectories are not public.** What Hugging Face published are aggregates, per-phase counts and an illustrative sample. The call log with its arguments, IDs and times is at the agents' operator.
 
-**El benchmark sí es público, pero ejecutarlo no cabe y no es gratis.** Correrlo significa levantar controlador, firewall y proxy LLM, descargar imágenes Docker por tarea, usar QEMU para las tareas de kernel y gastar claves de API de modelos frontera sobre instancias de explotación de vulnerabilidades reales. No entra en doce horas, y además es correr una evaluación de capacidad peligrosa, que es el origen del incidente sobre el que trata este sprint. El repositorio tampoco publica ejecuciones ya hechas: los artefactos de run (`config.json`, `result.json`, `task.log`, el workspace, `key_usage.json`, `scorer_result.json`) se generan al ejecutar y no vienen con el corpus.
+**The benchmark is public, but running it does not fit and is not free.** Running it means standing up controller, firewall and LLM proxy, downloading Docker images per task, using QEMU for the kernel tasks and spending frontier model API keys on instances of exploitation of real vulnerabilities. It does not fit in twelve hours, and besides it is running a dangerous capability evaluation, which is the origin of the incident this sprint is about. Nor does the repository publish already-completed runs: the run artifacts (`config.json`, `result.json`, `task.log`, the workspace, `key_usage.json`, `scorer_result.json`) are generated on execution and do not come with the corpus.
 
-Por tanto, si en algún momento hicieran falta trayectorias para esta parte, saldrían de una de estas dos vías, y ninguna está disponible ahora:
+Therefore, if at some point trajectories were needed for this part, they would come from one of these two routes, and neither is available now:
 
-1. **Del operador**, con los datos de la sección 6. Es la vía correcta y la que se pide en esa lista.
-2. **De ejecutar el harness con el portero interpuesto**, en un entorno con autorización explícita y fuera de este presupuesto, o de una ejecución publicada por un tercero con trayectorias utilizables.
+1. **From the operator**, with the data in section 6. It is the correct route and the one requested in that list.
+2. **From running the harness with the gatekeeper interposed**, in an environment with explicit authorization and outside this budget, or from a run published by a third party with usable trajectories.
 
-Lo que sí hacemos con material público y sin coste: leer y citar la configuración del control existente y construir la matriz de la sección 5 con los agregados. El ejecutor local simula la tarea de investigación con un encargo y llamadas propios; no imita la superficie de herramientas del harness ni reproduce su traza original.
+What we do do with public material and at no cost: read and cite the configuration of the existing control and build the matrix of section 5 with the aggregates. The local executor simulates the research task with our own task and calls; it does not imitate the harness's tool surface nor reproduce its original trace.
 
-### 10.1. Por qué no hay datos, y qué se deduce de eso
+### 10.1. Why there are no data, and what follows from that
 
-Buscamos datasets públicos de incidentes de agentes. Los hay, y ninguno sirve como entrada de un portero:
+We looked for public datasets of agent incidents. They exist, and none serves as input to a gatekeeper:
 
-| Fuente                                 | Qué es                                                     | ¿Trae las acciones del agente?                                             |
-| -------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
-| AI Incident Database                   | 962 incidentes, 4.743 informes                             | No. Relato en prosa y taxonomía.                                           |
-| Documented AI Agent Incidents, de METR | 44 incidentes puntuados por exceso de alcance y ocultación | Sin comprobar; antecedente fuera del compromiso del sprint.              |
-| RealHarm                               | 136 casos, 68 inseguros y 68 seguros                       | No. Conversaciones de chatbot, y los seguros son los inseguros reescritos. |
-| Reconstrucción de Hugging Face         | 17.613 acciones                                            | No. Conteos por fase y 21 ejemplos.                                        |
-| Wiki de este repositorio               | 13.661 ediciones                                           | Lo más cerca que hay, y son ediciones guardadas, no llamadas.              |
+| Source                                 | What it is                                             | Does it carry the agent's actions?                                          |
+| -------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------- |
+| AI Incident Database                   | 962 incidents, 4,743 reports                           | No. Prose narrative and taxonomy.                                           |
+| Documented AI Agent Incidents, by METR | 44 incidents scored by scope overreach and concealment | Unverified; antecedent outside the sprint commitment.                       |
+| RealHarm                               | 136 cases, 68 unsafe and 68 safe                       | No. Chatbot conversations, and the safe ones are the unsafe ones rewritten. |
+| Hugging Face reconstruction            | 17,613 actions                                         | No. Per-phase counts and 21 examples.                                       |
+| This repository's wiki                 | 13,661 edits                                           | The closest thing there is, and they are saved edits, not calls.            |
 
-**Esto no tiene sentido y hay que decirlo en el informe.** Si corres agentes, tienes que registrar qué acción hizo cada uno y quién la hizo. Si no, cuando algo sale mal no puedes saber quién hizo qué. No es una buena práctica opcional: sin ese registro no hay respuesta a incidentes posible, solo reconstrucción a posteriori con lo que se pueda rascar de los sistemas afectados, que es exactamente lo que tuvo que hacer Hugging Face.
+**This makes no sense and has to be said in the report.** If you run agents, you have to log which action each one did and who did it. If not, when something goes wrong you cannot know who did what. It is not an optional good practice: without that log there is no incident response possible, only after-the-fact reconstruction with whatever can be scraped from the affected systems, which is exactly what Hugging Face had to do.
 
-Y hay algo peor que la ausencia. Donde sí había registro, era manipulable: según la investigación de METR y Redwood, al menos el 7 % de las transcripciones estaba falseado porque los agentes sustituyeron parte del sistema que ejecuta las llamadas. El registro se estaba escribiendo en un sitio al que el agente llegaba.
+And there is something worse than absence. Where there was a log, it was manipulable: according to the METR and Redwood investigation, at least 7% of the transcripts were falsified because the agents replaced part of the system that executes the calls. The log was being written in a place the agent could reach.
 
-De ahí sale la segunda función del portero, además de bloquear: **es el punto donde se produce ese registro**, desde código de confianza y fuera del alcance de escritura del agente. Registrar la acción y quién la hizo, siempre, antes de ejecutarla. Un monitor que lee lo que el agente dice que hizo no da eso.
+From there comes the gatekeeper's second function, besides blocking: **it is the point where that log is produced**, from trusted code and outside the agent's write reach. Log the action and who did it, always, before executing it. A monitor that reads what the agent says it did does not give that.
 
-Y de ahí sale también nuestra situación de datos, que se declara tal cual: para el caso malo usamos la wiki, que es lo único real que existe. Los demás casos los escribimos nosotros y se etiquetan como propios.
+And from there also comes our data situation, which is declared as is: for the bad case we use the wiki, which is the only real thing that exists. The other cases are written by us and labeled as our own.
 
-## Parte 2 — La implementación: la wiki
+## Part 2 — The implementation: the wiki
 
-Las secciones 11 a 17 definen el trabajo que sí se implementa en el hackathon. Es la evidencia observable del patrón de la sección 2: agentes actuando sobre un recurso compartido sin que ningún control lo comprobara ni lo registrara. Las extensiones de modelos y coordinación que aparecen en estas secciones siguen siendo opcionales.
+Sections 11 to 17 define the work that is implemented in the hackathon. It is the observable evidence of the pattern in section 2: agents acting on a shared resource without any control checking or logging it. The model and coordination extensions that appear in these sections remain optional.
 
-## 11. Datos disponibles y recorrido del experimento
+## 11. Available data and experiment path
 
-### Del archivo al resultado
+### From the archive to the result
 
-1. Preparar un único dataset JSONL limpio y tabular, sin modificar el corpus original: una fila por revisión utilizada, con ID tomado de `label`, hora, página, contenido disponible y referencia a `rev_id`. Conservar en esa misma fila los campos y la procedencia necesarios para inspeccionarla y usarla, sin uniones posteriores obligatorias. La operación `wiki.edit` se marca como adaptación; los datos desconocidos quedan explícitos. Generar aparte el resumen de limpieza, que no es un segundo dataset de revisiones.
-2. Preparar la escena local de investigación, su encargo, páginas, preguntas y estado inicial. Escribir la política y los guiones legítimos y prohibidos, incluidos los casos y el parámetro de una restricción con memoria. Como no conocemos todos los encargos originales, esa política define el escenario que estamos probando; no se presenta como el permiso histórico recuperado del agente.
-3. Implementar el portero, las herramientas y el ejecutor controlado, con identidad y política asignadas desde código de confianza y registro de decisiones y resultados. Verificar una operación permitida que se ejecuta y una edición bloqueada que no llega a la herramienta.
-4. Añadir memoria separada por ejecución y agente para la restricción definida, incluyendo límites e intentos simultáneos.
-5. Ejecutar la demo guionizada sin LLM y, por separado, recorrer el dataset histórico cronológicamente sin ejecutar su contenido. Comparar capa 1 frente a capas 1+2, guardar decisiones, evidencia y casos no evaluables, y producir tablas o figuras y comandos reproducibles. Ejecutar análisis colectivo solo si se implementa la extensión.
+1. Prepare a single clean, tabular JSONL dataset, without modifying the original corpus: one row per revision used, with ID taken from `label`, time, page, available content and reference to `rev_id`. Keep in that same row the fields and provenance needed to inspect and use it, without mandatory later joins. The `wiki.edit` operation is marked as an adaptation; unknown data are made explicit. Generate the cleaning summary separately; it is not a second dataset of revisions.
+2. Prepare the local research scenario, its task, pages, questions and initial state. Write the policy and the legitimate and prohibited scripts, including the cases and the parameter of a memory restriction. Since we do not know all the original tasks, that policy defines the scenario we are testing; it is not presented as the historical permission recovered from the agent.
+3. Implement the gatekeeper, the tools and the controlled executor, with identity and policy assigned from trusted code and logging of decisions and results. Verify a permitted operation that executes and a blocked edit that never reaches the tool.
+4. Add memory separated per run and agent for the defined restriction, including limits and simultaneous attempts.
+5. Run the scripted demo without an LLM and, separately, walk through the historical dataset chronologically without executing its content. Compare layer 1 against layers 1+2, save decisions, evidence and non-evaluable cases, and produce tables or figures and reproducible commands. Run collective analysis only if the extension is implemented.
 
-**Productos de esta parte:** dataset único normalizado con procedencia, resumen de limpieza, escenario y guiones propios, políticas versionadas, portero y ejecutor local con memoria e identidad, log de decisiones, pruebas, demo y resultados reproducibles. La preparación del dataset es solo la primera fase. No incluye descargar una traza privada de OpenAI ni construir una campaña completa de Hugging Face a partir de sus agregados.
+**Products of this part:** single normalized dataset with provenance, cleaning summary, our own scenario and scripts, versioned policies, gatekeeper and local executor with memory and identity, decision log, tests, demo and reproducible results. Dataset preparation is only the first phase. It does not include downloading a private OpenAI trace or building a complete Hugging Face campaign from its aggregates.
 
-Los conteos de esta sección proceden de los archivos, no de asumir que los resúmenes anteriores son correctos. Prevalecen sobre las cifras y descripciones incompatibles del README de datos y de los documentos históricos.
+The counts in this section come from the files, not from assuming that earlier summaries are correct. They prevail over the incompatible figures and descriptions in the data README and the historical documents.
 
-### 11.1. Wiki: registro de ediciones
+### 11.1. Wiki: edit log
 
-| Archivo                  | Contenido y uso                                                                                                                                                          |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `revisions.jsonl.gz`     | **14.591 ediciones**. Base del análisis: `rev_id`, `label`, `time`, `page_key`, `body` y procedencia temporal.                                                           |
-| `labels.jsonl.gz`        | **3.103 filas**: 3 nombres humanos, 3.099 nombres no vacíos restantes y una etiqueta vacía. Incluye resúmenes; no añade una trayectoria de llamadas.                     |
-| `pages.jsonl.gz`         | **4.579 páginas**. Incluye `page_family` y campos de método/confianza. Hay 671 páginas `off_store_unclassified`; no son 4.579 ejemplos con una clasificación utilizable. |
-| `events.jsonl.gz`        | **19.913 sucesos del servidor**, entre ellos guardados y acciones del moderador. No es un registro completo de llamadas a herramientas de agentes.                       |
-| `records.jsonl.gz`       | **13.703 registros de texto procesado**, con procedencia. Puede ayudar a estudiar mensajes y adiciones; no es necesario unirlo para obtener el `body` de una revisión.   |
-| `links.jsonl.gz`         | **23.877 filas de URLs, 225 hosts distintos**, enlazadas con registros mediante `record_ids`. Son enlaces citados; no demuestran que el agente los visitara.             |
-| `other-wikis.json.gz`    | **90 fragmentos de revisión de 8 páginas**, desde el 11 de mayo. Tienen hora y cambios de texto, pero no un ID de agente; no completan los historiales por nombre.       |
-| `shortener-logs.json.gz` | **499 registros de enlaces** con hora y un contador de clics, sin ID de agente ni hora de cada clic. No permiten reconstruir quién visitó cada enlace.                   |
-| Otros archivos           | Manifiesto, ZIP y notas de cobertura. El ZIP coincide con los cinco archivos comprimidos correspondientes; son copias, no acciones adicionales.                          |
+| File                     | Content and use                                                                                                                                                               |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `revisions.jsonl.gz`     | **14,591 edits**. Basis of the analysis: `rev_id`, `label`, `time`, `page_key`, `body` and temporal provenance.                                                               |
+| `labels.jsonl.gz`        | **3,103 rows**: 3 human names, 3,099 remaining non-empty names and one empty label. Includes summaries; does not add a call trajectory.                                       |
+| `pages.jsonl.gz`         | **4,579 pages**. Includes `page_family` and method/confidence fields. There are 671 `off_store_unclassified` pages; they are not 4,579 examples with a usable classification. |
+| `events.jsonl.gz`        | **19,913 server events**, among them saves and moderator actions. It is not a complete log of agent tool calls.                                                               |
+| `records.jsonl.gz`       | **13,703 processed-text records**, with provenance. It can help study messages and additions; it is not necessary to join it to get a revision's `body`.                      |
+| `links.jsonl.gz`         | **23,877 URL rows, 225 distinct hosts**, linked to records via `record_ids`. They are cited links; they do not prove the agent visited them.                                  |
+| `other-wikis.json.gz`    | **90 revision fragments from 8 pages**, from 11 May. They have time and text changes, but no agent ID; they do not complete the histories by name.                            |
+| `shortener-logs.json.gz` | **499 link records** with time and a click counter, without agent ID or time of each click. They do not allow reconstructing who visited each link.                           |
+| Other files              | Manifest, ZIP and coverage notes. The ZIP matches the five corresponding compressed files; they are copies, not additional actions.                                           |
 
-**Población acordada para el experimento:** tratamos como agentes los nombres no vacíos que no están identificados como humanos. Usamos el nombre literal como ID, sin agruparlo por IP ni por semejanza del texto.
+**Agreed population for the experiment:** we treat as agents the non-empty names not identified as human. We use the literal name as ID, without grouping by IP or by text similarity.
 
-Al excluir las 31 ediciones de los tres nombres humanos y las 899 sin nombre, quedan **13.661 ediciones de 3.099 IDs**. La mediana es **2 ediciones por ID**; solo **86 IDs superan 20 ediciones**. Son historiales cortos: no justifican aprender las costumbres de cada agente.
+Excluding the 31 edits from the three human names and the 899 without a name, **13,661 edits from 3,099 IDs** remain. The median is **2 edits per ID**; only **86 IDs exceed 20 edits**. These are short histories: they do not justify learning each agent's habits.
 
-Las revisiones principales van del 24 de mayo al 2 de julio de 2026. Las fechas de otros archivos describen otras poblaciones: no se presenta el primer fragmento del 11 de mayo como la primera llamada identificada de esta tabla.
+The main revisions run from 24 May to 2 July 2026. The dates of other files describe other populations: the first fragment from 11 May is not presented as the first identified call of this table.
 
-El supuesto se declara una vez: un nombre representa un ID a efectos del análisis; el corpus no permite distinguir de forma fiable nombres compartidos o cambios de nombre. No se intenta resolver esa identidad mediante inferencias.
+The assumption is declared once: a name represents an ID for the purposes of the analysis; the corpus does not allow reliably distinguishing shared names or name changes. No attempt is made to resolve that identity through inference.
 
-### 11.2. Qué no podemos deducir de esas ediciones
+### 11.2. What we cannot deduce from those edits
 
-- Una edición observada no contiene necesariamente el nombre y todos los argumentos de la herramienta original. Representarla como `wiki.edit` es una adaptación declarada, no recuperar la llamada original.
-- Faltan lecturas, llamadas a otras herramientas y otros intentos. Un intervalo entre ediciones mide ritmo de escritura observado, no ritmo total del agente.
-- `body` contiene el texto guardado de la página, que puede conservar aportaciones anteriores. No atribuimos todo ese contenido al autor de la última edición. Para estudiar propagación se usan cambios respecto a una base disponible o adiciones con procedencia comprobada.
-- `stored_revisions`, `save_requests`, listas de páginas y otras cifras de `labels` son resúmenes. No se convierten en eventos con horas inventadas ni se usan para conocer el futuro durante una reproducción cronológica.
-- `page_family` describe la función atribuida a una página. No decide si cada edición estaba autorizada ni proporciona el encargo original del agente.
+- An observed edit does not necessarily contain the name and all the arguments of the original tool. Representing it as `wiki.edit` is a declared adaptation, not recovering the original call.
+- Reads, calls to other tools and other attempts are missing. An interval between edits measures observed writing pace, not the agent's total pace.
+- `body` contains the saved text of the page, which may keep earlier contributions. We do not attribute all that content to the author of the last edit. To study propagation, changes relative to an available baseline or additions with verified provenance are used.
+- `stored_revisions`, `save_requests`, page lists and other figures in `labels` are summaries. They are not turned into events with invented times nor used to know the future during a chronological replay.
+- `page_family` describes the function attributed to a page. It does not decide whether each edit was authorized nor provide the agent's original task.
 
-### 11.3. Recuperación, limpieza y orden
+### 11.3. Recovery, cleaning and ordering
 
-Para seguir un historial de la wiki hacen falta un ID, una hora interpretable y una página. Si falta uno, se intenta recuperar mediante una referencia explícita y no ambigua entre registros. Si no se puede, se excluye ese registro de ese análisis. No se inventan IDs ni se agrupan todos los anónimos en un agente ficticio.
+To follow a wiki history, an ID, an interpretable time and a page are needed. If one is missing, an attempt is made to recover it through an explicit and unambiguous reference between records. If it cannot be, that record is excluded from that analysis. No IDs are invented and the anonymous ones are not all grouped into a fictitious agent.
 
-La necesidad del campo depende de la prueba: una comparación de contenido necesita texto; un recuento de acciones no. Un campo opcional ausente no invalida los demás datos. Una cadena vacía que representa una página vaciada puede ser un dato válido, no un NaN.
+The need for a field depends on the test: a content comparison needs text; an action count does not. A missing optional field does not invalidate the other data. An empty string representing a blanked page can be valid data, not a NaN.
 
-Se conservan los originales y se genera un resumen de limpieza: filas de entrada, recuperadas, descartadas por motivo y usadas en cada evaluación. Las recuperaciones y uniones mantienen referencias a las filas de origen. No se fuerza una unión por semejanza de textos ni se multiplican acciones al unir varias URLs a una revisión.
+The originals are kept and a cleaning summary is generated: input rows, recovered, discarded by reason and used in each evaluation. Recoveries and joins keep references to the source rows. No join by text similarity is forced and actions are not multiplied when joining several URLs to one revision.
 
-El dataset preparado es autocontenido para su uso previsto: las columnas necesarias para el análisis y su procedencia se conservan en el único archivo JSONL. Esto no exige copiar todos los archivos ni incorporar cada resumen disponible. Los resúmenes calculados con información posterior y `page_family` no se usan como entrada de decisión del portero.
+The prepared dataset is self-contained for its intended use: the columns needed for the analysis and their provenance are kept in the single JSONL file. This does not require copying all the files or incorporating every available summary. Summaries computed with later information and `page_family` are not used as decision input for the gatekeeper.
 
-La unión por página con `pages` cubre todas las revisiones. Una unión con `records` por página y fecha puede devolver varios candidatos o compartir clave con varias revisiones; no demuestra por sí sola la autoría. No se arrastran las cifras previas de «69 %» o «9.233 filas completas» como condición para trabajar con texto: `revisions` ya lo contiene.
+The join by page with `pages` covers all revisions. A join with `records` by page and date may return several candidates or share a key with several revisions; it does not on its own prove authorship. The earlier figures of "69%" or "9,233 complete rows" are not carried forward as a condition for working with text: `revisions` already contains it.
 
-Se procesa por tiempo y se conserva su procedencia e incertidumbre. Si varias revisiones comparten segundo, un desempate técnico permite reproducir la ejecución, pero no demuestra cuál ocurrió primero entre agentes. No se evalúan patrones que necesiten un orden subsegundo que no tenemos.
+Processing is by time and its provenance and uncertainty are kept. If several revisions share a second, a technical tiebreak allows reproducing the run, but does not prove which happened first between agents. Patterns that need a sub-second order we do not have are not evaluated.
 
-### 11.4. Hugging Face: agregados y muestras
+### 11.4. Hugging Face: aggregates and samples
 
-`datos-replay-hf.json` contiene **9 fases, 5 totales diarios, 6 puntos de una curva acumulada y 21 eventos ilustrativos**. Los totales diarios suman **17.613 acciones**. Las fases suman 16.521, se solapan y no forman etapas consecutivas; la diferencia numérica no permite etiquetar acciones individuales ausentes.
+`datos-replay-hf.json` contains **9 phases, 5 daily totals, 6 points of a cumulative curve and 21 illustrative events**. The daily totals add up to **17,613 actions**. The phases add up to 16,521, overlap and do not form consecutive stages; the numerical difference does not allow labeling individual missing actions.
 
-**No tenemos 17.613 llamadas con sus argumentos, IDs y timestamps.** Generar esa cantidad de filas hasta cuadrar los totales produciría una simulación. No recuperaría la secuencia real, el ritmo ni las llamadas exactas del orquestador.
+**We do not have 17,613 calls with their arguments, IDs and timestamps.** Generating that many rows until the totals match would produce a simulation. It would not recover the real sequence, pace or exact calls of the orchestrator.
 
-La matriz control × fase de la sección 5 se construye con estos mismos agregados y hereda todos sus límites. Estos datos sirven para eso, para contextualizar el incidente y preparar casos de prueba propios inspirados en acciones documentadas, con sus supuestos visibles. No permiten afirmar «el portero habría cortado exactamente en la llamada 272» ni fijar un horizonte real de visibilidad en la llamada 600. No se interpolan horas para evaluar patrones temporales.
+The control × phase matrix of section 5 is built with these same aggregates and inherits all their limits. These data serve for that, to contextualize the incident and prepare our own test cases inspired by documented actions, with their assumptions visible. They do not allow claiming "the gatekeeper would have cut exactly at call 272" nor setting a real visibility horizon at call 600. Times are not interpolated to evaluate temporal patterns.
 
-### 11.5. Ejemplos de trabajo correcto: casos propios
+### 11.5. Examples of correct work: our own cases
 
-**Qué es esto.** La wiki son 13.661 ediciones y todas son del incidente. Si solo probamos el portero contra ese corpus, una regla que bloquee todo acierta el 100 % y no sirve para nada, porque también pararía a un agente haciendo su trabajo. Hace falta el grupo de control: agentes trabajando bien, para contar cuántos bloqueamos por error. Los documentos del proyecto lo llaman «carga legítima».
+**What this is.** The wiki is 13,661 edits and all of them are from the incident. If we only test the gatekeeper against that corpus, a rule that blocks everything scores 100% and is useless, because it would also stop an agent doing its job. The control group is needed: agents working correctly, to count how many we block by mistake. The project documents call it "legitimate load".
 
-**La vía elegida para el sprint es escribir casos propios de investigación, con encargo, llamadas guionizadas y resultados esperados.** Incluyen trabajo permitido que debe completarse y un intento de editar la wiki que debe bloquearse. No dependen de encontrar ni descargar un corpus externo. Se separan los ejemplos usados para preparar reglas de los usados para evaluarlas.
+**The route chosen for the sprint is to write our own research cases, with task, scripted calls and expected results.** They include permitted work that must complete and an attempt to edit the wiki that must be blocked. They do not depend on finding or downloading an external corpus. The examples used to prepare rules are separated from those used to evaluate them.
 
-**Antecedentes fuera del compromiso del sprint:** dos candidatos localizados el 11 de septiembre de 2026, ninguno descargado entonces porque el proxy de aquella sesión bloqueaba `huggingface.co` por WebFetch, curl y git:
+**Antecedents outside the sprint commitment:** two candidates located on 11 September 2026, neither downloaded then because that session's proxy blocked `huggingface.co` for WebFetch, curl and git:
 
-| Candidato                    | Qué contiene                                                                                                                                                | Por qué encaja                                                                                     |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `trace-commons/agent-traces` | Sesiones por harness (claude_code, codex, cursor, opencode y otros) con campos `harness`, `session_id`, `prompt`, `messages`, `tools`, `trace`, `metadata`. | Trae identidad de sesión, encargo y llamadas con argumentos: las tres cosas que pide esta sección. |
-| `CyCraftAI/TraceSafe`        | `golden_0_benign.jsonl`, 90 trazas benignas de referencia sin mutación, de un trabajo sobre guardarraíles en trayectorias de llamadas a herramienta.        | Ya está etiquetado como línea base benigna.                                                        |
+| Candidate                    | What it contains                                                                                                                                                | Why it fits                                                                                      |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `trace-commons/agent-traces` | Sessions per harness (claude_code, codex, cursor, opencode and others) with fields `harness`, `session_id`, `prompt`, `messages`, `tools`, `trace`, `metadata`. | Carries session identity, task and calls with arguments: the three things this section asks for. |
+| `CyCraftAI/TraceSafe`        | `golden_0_benign.jsonl`, 90 benign reference traces without mutation, from a work on guardrails over tool-call trajectories.                                    | It is already labeled as a benign baseline.                                                      |
 
-Su licencia, esquema real y adecuación no están verificados. Quedan como antecedentes; investigarlos no es una tarea pendiente de esta entrega.
+Their license, actual schema and suitability are not verified. They remain as antecedents; investigating them is not a pending task of this deliverable.
 
-Las instancias de ExploitGym **no se usan** para escribir el encargo, las llamadas ni las pruebas. Nuestra escena sigue la tarea de investigación descrita en este documento.
+ExploitGym instances **are not used** to write the task, the calls or the tests. Our scenario follows the research task described in this document.
 
-Los casos propios prueban comportamiento en esas situaciones concretas; no justifican una tasa general de falsos positivos ni muestran cómo reaccionaría un LLM tras un bloqueo. No se presenta «wiki del incidente frente a otro corpus» como prueba suficiente de detección de ataques: podría distinguir simplemente las fuentes.
+Our own cases test behavior in those specific situations; they do not justify a general false-positive rate nor show how an LLM would react after a block. "Incident wiki versus another corpus" is not presented as sufficient proof of attack detection: it could simply be distinguishing the sources.
 
-## 12. Registro del experimento y correspondencia con el sistema real
+## 12. Experiment log and correspondence with the real system
 
-En las pruebas con un ejecutor controlado y en el futuro sistema real, el programa que crea una ejecución asigna su `run_id` y el ID de cada instancia de agente, `agent_id`. Los adjunta a cada llamada desde código de confianza. Los subagentes reciben IDs propios; compartir modelo no implica compartir ID. El texto generado por el agente no puede sustituir estos identificadores ni los permisos.
+In the tests with a controlled executor and in the future real system, the program that creates a run assigns its `run_id` and the ID of each agent instance, `agent_id`. It attaches them to each call from trusted code. Subagents receive their own IDs; sharing a model does not imply sharing an ID. Text generated by the agent cannot replace these identifiers or the permissions.
 
-En la wiki se usa `label` como `agent_id`. Un identificador de reproducción separa experimentos, pero no se presenta como el ID original de ejecución que el corpus no contiene. En trazas externas se conserva el significado documentado de sus IDs.
+In the wiki, `label` is used as `agent_id`. A replay identifier separates experiments, but is not presented as the original run ID that the corpus does not contain. In external traces the documented meaning of their IDs is kept.
 
-El registro común incluye:
+The common log includes:
 
-| Dato                                                     | Para qué sirve                                                                                                                  |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| ID de evento y referencia de origen                      | Volver a la evidencia y evitar contar dos veces una acción.                                                                     |
-| `run_id`, `agent_id` y procedencia del ID                | Separar historiales y distinguir identidad real de la aproximación usada en la wiki.                                            |
-| Hora y orden observado                                   | Evaluar restricciones temporales cuando los datos lo permiten.                                                                  |
-| Herramienta, operación, destino y argumentos disponibles | Evaluar la llamada. En la wiki, marcar expresamente los campos reconstruidos y desconocidos.                                    |
-| Tarea autorizada y versión de política                   | Saber contra qué encargo y permisos se juzga. Se reciben del sistema; no se aceptan de una justificación escrita por el agente. |
-| Resultado de ejecución, cuando existe                    | Distinguir intento, permiso concedido y operación efectivamente terminada.                                                      |
+| Data                                                 | What it is for                                                                                                                                            |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Event ID and source reference                        | Go back to the evidence and avoid counting an action twice.                                                                                               |
+| `run_id`, `agent_id` and provenance of the ID        | Separate histories and distinguish real identity from the approximation used in the wiki.                                                                 |
+| Time and observed order                              | Evaluate temporal restrictions when the data allow it.                                                                                                    |
+| Tool, operation, destination and available arguments | Evaluate the call. In the wiki, expressly mark the reconstructed and unknown fields.                                                                      |
+| Authorized task and policy version                   | Know against which task and permissions it is judged. They are received from the system; they are not accepted from a justification written by the agent. |
+| Execution result, when it exists                     | Distinguish attempt, permission granted and operation actually completed.                                                                                 |
 
-En cada evento se distingue lo observado de lo asignado al experimento: el nombre y la hora proceden de la wiki; el ID de reproducción, la política de escenario y la representación `wiki.edit` los añade nuestro programa. El encargo original desconocido no se rellena con una etiqueta de página ni con una explicación escrita por un modelo.
+In each event what is observed is distinguished from what is assigned to the experiment: the name and the time come from the wiki; the replay ID, the scenario policy and the `wiki.edit` representation are added by our program. The unknown original task is not filled in with a page label or with an explanation written by a model.
 
-El dataset preparado conserva la evidencia histórica y su adaptación declarada. El `run_id`, la política activa, la decisión y el resultado de cada reproducción se registran al ejecutarla; no se presentan como datos históricos ni como ejecución de una edición del corpus. Este log de resultados es distinto del único dataset de entrada.
+The prepared dataset keeps the historical evidence and its declared adaptation. The `run_id`, the active policy, the decision and the result of each replay are recorded when it is run; they are not presented as historical data or as execution of a corpus edit. This results log is distinct from the single input dataset.
 
-**Esto no es propuesta nuestra:** el harness del caso ya genera por tarea un `agent_id` y un token desde el controlador, o sea identidad puesta por código de confianza — y aun así no había ninguna comprobación en la llamada. Asignar un ID sirve para atribuir, no sustituye restringir credenciales y permisos. Si una integración mezcla agentes sin decir quién hizo cada llamada, se arregla la integración: el portero no lo adivina del contenido.
+**This is not our proposal:** the case's harness already generates per task an `agent_id` and a token from the controller, that is, identity set by trusted code — and even so there was no check at the call. Assigning an ID serves to attribute; it does not replace restricting credentials and permissions. If an integration mixes agents without saying who made each call, the integration is fixed: the gatekeeper does not guess it from the content.
 
-## 13. Cómo funciona cada capa
+## 13. How each layer works
 
-### Capa 1 — Reglas de permisos
+### Layer 1 — Permission rules
 
-**Entrada:** llamada actual y política asignada a esa ejecución.
+**Input:** current call and policy assigned to that run.
 
-**Operación:** buscar la llamada en la lista de permitidas y comprobar sus argumentos. Si no está, se bloquea. Las reglas viven en YAML con identificador, origen, datos que necesitan y respuesta.
+**Operation:** look up the call in the allowlist and check its arguments. If it is not there, it is blocked. The rules live in YAML with identifier, origin, data they need and response.
 
-**Se comprueba lo que se ejecuta de verdad,** no lo que parece: el destino y los argumentos ya validados, sin que una redirección o un intermediario conviertan un permiso estrecho en acceso libre. Y el alcance llega hasta donde llegan las herramientas integradas: aprobar una herramienta que ejecuta código no controla lo que ese código haga por dentro.
+**What is actually executed is checked,** not what it looks like: the destination and arguments already validated, without a redirect or an intermediary turning a narrow permission into free access. And the scope reaches as far as the integrated tools reach: approving a tool that executes code does not control what that code does inside.
 
-**Salida:** permiso o bloqueo, ID de la regla y motivo. Si faltan datos para evaluar una regla en el análisis histórico, se registra «no evaluable»; no se cuenta como acierto ni como acción legítima. En ejecución real, la falta de identidad o datos imprescindibles impide ejecutar la llamada.
+**Output:** permission or block, rule ID and reason. If data are missing to evaluate a rule in the historical analysis, "not evaluable" is recorded; it is not counted as a hit or as a legitimate action. In real execution, missing identity or essential data prevents executing the call.
 
-**Una sola versión de reglas.** Cada regla lleva su origen documentado: la recomendación que concreta, por ejemplo AIS-13 y la guía de operaciones de vulnerabilidades de CSA citadas en el documento del sprint, o la evidencia del incidente que la motiva. La política se fija antes de evaluar y no se toca después.
+**A single version of the rules.** Each rule carries its documented origin: the recommendation it makes concrete, for example AIS-13 and the CSA vulnerability operations guide cited in the sprint document, or the incident evidence that motivates it. The policy is fixed before evaluating and not touched afterwards.
 
-No se comparan versiones de reglas entre sí. Ya hemos leído el incidente, así que una supuesta versión escrita «antes de conocer los datos» no sería un ensayo ciego y no probaría nada. La única comparación que se informa es la del PRD: capa 1 sola frente a capa 1+2.
+Rule versions are not compared with each other. We have already read the incident, so a supposed version written "before knowing the data" would not be a blind trial and would prove nothing. The only comparison reported is the PRD's: layer 1 alone against layers 1+2.
 
-#### Una sola política, y es una lista de llamadas permitidas
+#### A single policy, and it is a list of permitted calls
 
-**La política dice qué llamadas autoriza la tarea. Lo que no está en la lista se bloquea.** No hay una lista de lo prohibido, y en particular no hay ninguna regla que diga «no editar una página». Editar salta por no estar entre las autorizadas, igual que saltaría cualquier otra cosa que no hayamos previsto.
+**The policy says which calls the task authorizes. What is not on the list is blocked.** There is no list of what is prohibited, and in particular there is no rule saying "do not edit a page". Editing trips because it is not among the authorized ones, just as anything else we had not foreseen would trip.
 
-Esa es la diferencia entre un portero y un filtro. Un filtro necesita acertar de antemano qué intentará el agente; una lista de permitidas no necesita adivinar nada. Es denegación por defecto, y es lo que hace que el control siga funcionando contra un abuso que no se nos había ocurrido.
+That is the difference between a gatekeeper and a filter. A filter needs to guess in advance what the agent will try; an allowlist does not need to guess anything. It is default deny, and it is what keeps the control working against an abuse that had not occurred to us.
 
-**La lista sale de la tarea, no de lo que convenga que dispare.** La tarea reconstruida es investigación web por rondas y contra reloj, con plazo por ronda y espera obligatoria entre una y la siguiente. De ahí salen exactamente cinco llamadas autorizadas: leer una página, buscar, leer la pregunta de la ronda, entregar la respuesta y esperar. Ver [hallazgos-tarea-wiki.md](hallazgos-tarea-wiki.md).
+**The list comes from the task, not from whatever is convenient to fire.** The reconstructed task is web research in rounds and against the clock, with a deadline per round and a mandatory wait between one and the next. From there come exactly five authorized calls: read a page, search, read the round's question, submit the answer and wait. See [hallazgos-tarea-wiki.md](hallazgos-tarea-wiki.md).
 
-**Una sola política, no dos escenarios.** Revisiones anteriores de este documento planteaban un escenario estricto y otro permisivo, definidos por la anchura de una allowlist de destinos. Eso venía de cuando el eje era el destino. Con la lista de llamadas ese planteamiento sobra: la tarea autoriza un conjunto de llamadas y no hay una versión ancha y otra estrecha de la misma tarea. Se fija antes de evaluar y no se toca después.
+**A single policy, not two scenarios.** Earlier revisions of this document proposed a strict scenario and a permissive one, defined by the width of a destination allowlist. That came from when the axis was the destination. With the list of calls that approach is superfluous: the task authorizes a set of calls and there is no wide version and narrow version of the same task. It is fixed before evaluating and not touched afterwards.
 
-**Dónde queda la allowlist de destinos del harness.** Donde le corresponde: es el control que ya existía, y está en la sección 2 y en la matriz de la sección 5, no como política nuestra. Sirve para comparar qué ve el perímetro y qué ve una comprobación en la llamada. Nunca afirmamos que fuera la política que tenían los agentes de la wiki, porque no lo sabemos.
+**Where the harness's destination allowlist ends up.** Where it belongs: it is the control that already existed, and it is in section 2 and in the matrix of section 5, not as our policy. It serves to compare what the perimeter sees and what a check at the call sees. We never claim it was the policy the wiki agents had, because we do not know.
 
-**Qué se espera bloquear sobre el corpus.** Cada revisión utilizable se representa como la operación adaptada `wiki.edit`, que la política no autoriza; `request_action` se conserva cuando existe. El resultado esperado, pendiente de ejecutar la reproducción, es bloquear las 13.661 ediciones, incluida la primera de cada uno de los 3.099 IDs, sin que las capas siguientes reciban llamadas autorizadas. Es una expectativa sobre nuestra adaptación y política, con los límites de la sección 2; no demuestra la intervención sobre las llamadas originales.
+**What is expected to be blocked over the corpus.** Each usable revision is represented as the adapted operation `wiki.edit`, which the policy does not authorize; `request_action` is kept when it exists. The expected result, pending running the replay, is to block the 13,661 edits, including the first of each of the 3,099 IDs, without the subsequent layers receiving authorized calls. It is an expectation about our adaptation and policy, with the limits of section 2; it does not prove the intervention over the original calls.
 
-**Qué NO mide el corpus.** Si el portero estorba. La wiki solo apuntó lo que le llegó a la wiki, es decir, solo las llamadas que la lista bloquea; las permitidas ocurrieron y no están registradas en ninguna parte. Esa mitad de la pregunta se mide en el programa de prueba local, con casos declarados como material propio.
+**What the corpus does NOT measure.** Whether the gatekeeper gets in the way. The wiki only recorded what reached the wiki, that is, only the calls the list blocks; the permitted ones happened and are not recorded anywhere. That half of the question is measured in the local test program, with cases declared as our own material.
 
-**Qué queda para la capa 2.** Límites acumulativos con parámetro, y el parámetro sale de la forma de la tarea. El nuestro es la espera obligatoria entre rondas: `clock.wait` está permitida en la lista, porque la tarea impone esperas, y encadenarla para adelantar el reloj es el incumplimiento. Solo se ve con el historial del mismo agente. No es reproducible con este corpus y se demuestra en el programa local. Si la capa 2 no añade bloqueo sobre lo que ya resolvió la capa 1, se informa de eso.
+**What is left for layer 2.** Cumulative limits with a parameter, and the parameter comes from the shape of the task. Ours is the mandatory wait between rounds: `clock.wait` is permitted on the list, because the task imposes waits, and chaining it to advance the clock is the violation. It is only visible with the same agent's history. It is not reproducible with this corpus and is demonstrated in the local program. If layer 2 adds no block over what layer 1 already resolved, that is reported.
 
-### Capa 2 — Análisis individual mediante reglas con memoria
+### Layer 2 — Individual analysis through memory rules
 
-**Entrada:** llamada actual, política y memoria de esa ejecución e ID.
+**Input:** current call, policy and memory of that run and ID.
 
-**Operación:** conservar los contadores o antecedentes que exige cada regla. Por ejemplo, un presupuesto de operaciones definido para la tarea, un límite autorizado de páginas modificadas o una secuencia de pasos expresamente requerida.
+**Operation:** keep the counters or history each rule requires. For example, an operations budget defined for the task, an authorized limit of modified pages or an expressly required sequence of steps.
 
-Una llamada puede estar permitida por la capa 1 y superar un presupuesto al sumar las anteriores. Ese es el aporte propio de la capa 2. No necesita aprender qué es «normal» ni esperar K llamadas para empezar a funcionar.
+A call can be permitted by layer 1 and exceed a budget when the previous ones are added up. That is layer 2's own contribution. It does not need to learn what is "normal" or wait K calls to start working.
 
-Cada regla debe especificar qué cuenta: intentos, operaciones autorizadas o resultados confirmados. Las cuotas que autorizan una acción se comprueban y reservan antes de ejecutarla, para que llamadas simultáneas no gasten dos veces el mismo permiso. El registro distingue intentos bloqueados y acciones ejecutadas.
+Each rule must specify what counts: attempts, authorized operations or confirmed results. Quotas that authorize an action are checked and reserved before executing it, so that simultaneous calls do not spend the same permission twice. The log distinguishes blocked attempts and executed actions.
 
-**Salida:** estado actualizado, evidencia de la secuencia y permiso, aviso, retención o bloqueo según la regla. Los límites duros vienen del encargo o de una política explícita. Un patrón exploratorio sin ese fundamento genera como máximo un aviso; no una expulsión automática por rareza.
+**Output:** updated state, evidence of the sequence and permission, warning, hold or block according to the rule. Hard limits come from the task or from an explicit policy. An exploratory pattern without that basis generates at most a warning; not an automatic expulsion for unusualness.
 
-**No se inventarán reglas para justificar esta capa.** La memoria y las comprobaciones de restricciones definidas forman parte del núcleo; si un escenario no tiene una restricción útil sobre el historial, se informa de que la capa 2 no aporta un bloqueo adicional en ese escenario.
+**Rules will not be invented to justify this layer.** Memory and the checks of defined restrictions are part of the core; if a scenario has no useful restriction over the history, it is reported that layer 2 adds no additional block in that scenario.
 
-Los límites y ventanas concretos se fijan al seleccionar las tareas y los casos de prueba. Esos parámetros pendientes no reabren el alcance ni se ajustan para obtener un buen resultado sobre el conjunto final de evaluación.
+The concrete limits and windows are set when selecting the tasks and test cases. Those pending parameters do not reopen the scope and are not tuned to obtain a good result on the final evaluation set.
 
-### Capa 3 — Revisión con un modelo, opcional
+### Layer 3 — Review with a model, optional
 
-**Entrada:** encargo autorizado, permisos, herramienta y argumentos de la llamada pendiente, más el contexto reciente y las señales necesarias. No basta con comparar el nombre de la herramienta con una frase de objetivo.
+**Input:** authorized task, permissions, tool and arguments of the pending call, plus the recent context and the necessary signals. Comparing the tool name with a goal sentence is not enough.
 
-**Operación:** decidir si la llamada encaja con la tarea. Se puede invocar por un caso dudoso de las reglas o por una operación configurada para revisión; no tiene que depender exclusivamente de acumular sospecha en la capa 2.
+**Operation:** decide whether the call fits the task. It can be invoked by a doubtful case from the rules or by an operation configured for review; it does not have to depend exclusively on accumulating suspicion in layer 2.
 
-Primera opción a probar: un LLM pequeño de pesos abiertos en local. No se presupone que sea suficientemente preciso ni que todo LLM sea caro. Se miden errores, tiempo y recursos. Un clasificador especializado puede sustituirlo si resuelve esa misma decisión y dispone de ejemplos y evaluación adecuados. Un detector de texto malicioso o de inyección de instrucciones no equivale a un clasificador de autorización de llamadas.
+First option to try: a small open-weights LLM locally. It is not assumed to be sufficiently accurate nor that every LLM is expensive. Errors, time and resources are measured. A specialized classifier can replace it if it resolves that same decision and has suitable examples and evaluation. A malicious-text or instruction-injection detector is not equivalent to a call authorization classifier.
 
-**Salida:** compatible con la tarea, incompatible o información insuficiente, con motivo y referencias a la evidencia. Compatible permite continuar solo si las reglas duras ya se cumplen; incompatible bloquea según la política de revisión; información insuficiente mantiene la llamada retenida. El modelo nunca levanta un bloqueo de las capas 1 o 2.
+**Output:** compatible with the task, incompatible or insufficient information, with reason and references to the evidence. Compatible allows continuing only if the hard rules are already met; incompatible blocks according to the review policy; insufficient information keeps the call held. The model never lifts a block from layers 1 or 2.
 
-La llamada queda pendiente mientras se revisa. Un error, timeout o respuesta inválida no equivale a permiso. No se dan herramientas al juez y se trata el contenido examinado como dato no confiable; una respuesta JSON válida no garantiza una decisión correcta.
+The call stays pending while it is reviewed. An error, timeout or invalid response is not equivalent to permission. The judge is given no tools and the examined content is treated as untrusted data; a valid JSON response does not guarantee a correct decision.
 
-La wiki no aporta directamente pares completos «encargo original + llamada + decisión correcta». Sin ejemplos adecuados y sin tiempo para compararlo con el portero básico, esta capa queda sin implementar, incluida su interfaz. Una revisión humana puede resolver casos retenidos; construir una interfaz humana completa tampoco es obligatorio.
+The wiki does not directly provide complete "original task + call + correct decision" pairs. Without suitable examples and without time to compare it against the basic gatekeeper, this layer remains unimplemented, including its interface. A human review can resolve held cases; building a complete human interface is not mandatory either.
 
-### Capa 4 — Análisis entre agentes, opcional
+### Layer 4 — Cross-agent analysis, optional
 
-**Entrada:** acciones con ID, hora y página o destino; cambios de contenido cuando puedan atribuirse. No recibe las etiquetas de evaluación.
+**Input:** actions with ID, time and page or destination; content changes when they can be attributed. It does not receive the evaluation labels.
 
-**Operación inicial:** agrupar por página y registrar cuándo aparece por primera vez cada ID. Repetir una escritura con el mismo ID no añade un participante. Se estudia cómo llegan participantes nuevos y, si hay tiempo, la repetición de URLs o fragmentos poco comunes entre IDs.
+**Initial operation:** group by page and record when each ID first appears. Repeating a write with the same ID does not add a participant. How new participants arrive is studied and, if there is time, the repetition of uncommon URLs or fragments between IDs.
 
-La curva en S es una hipótesis para comparar con alternativas simples, no una prueba de coordinación. La actividad legítima también puede converger o empezar tarde. Sin el encargo original no se afirma que una página esté fuera de la tarea a partir de su clasificación posterior.
+The S-curve is a hypothesis to compare with simple alternatives, not proof of coordination. Legitimate activity can also converge or start late. Without the original task it is not claimed that a page is outside the task based on its later classification.
 
-**Salida:** páginas señaladas, momento del aviso, IDs involucrados y evidencia. En la wiki es análisis sobre el log; no bloquea automáticamente a una población por compartir un destino. En la arquitectura posterior, esas evidencias se pueden reunir con las individuales para que la capa 3 revise el caso. No necesitan pasar primero por un umbral individual ni se ejecutan después del juez como un cuarto filtro.
+**Output:** flagged pages, moment of the warning, IDs involved and evidence. In the wiki it is analysis over the log; it does not automatically block a population for sharing a destination. In the later architecture, that evidence can be gathered with the individual evidence so that layer 3 reviews the case. It does not need to pass through an individual threshold first, nor is it run after the judge as a fourth filter.
 
-`page_family` y sus campos derivados quedan separados hasta la evaluación. Se define qué categorías se intentan detectar y cuáles no tienen etiqueta utilizable; desconocido no equivale a benigno. Además de las 671 páginas `off_store_unclassified`, hay 677 `source-or-unclassified` y 34 `unknown`, que no se convierten automáticamente en negativos. Se informa de la cobertura de esa selección y de cómo se construyeron las etiquetas: coincidir con una clasificación basada en nombres o texto no aporta por sí solo una validación independiente de coordinación. Tampoco se incorporan resúmenes futuros del corpus a una decisión que pretende ser en línea.
+`page_family` and its derived fields are kept separate until evaluation. Which categories are attempted to be detected and which have no usable label is defined; unknown is not equivalent to benign. Besides the 671 `off_store_unclassified` pages, there are 677 `source-or-unclassified` and 34 `unknown`, which are not automatically turned into negatives. The coverage of that selection and how the labels were built is reported: matching a classification based on names or text does not by itself provide an independent validation of coordination. Nor are future summaries of the corpus incorporated into a decision that is meant to be online.
 
-Se compara con contar popularidad y con actividad legítima compartida. Si se usan datos sintéticos, deben incluir también convergencia legítima; no basta con oponer agentes independientes a agentes que se copian. El resultado describe detección de actividad asociada a las categorías elegidas, no demuestra intención, comunicación causal ni prevención de un escape.
+It is compared with counting popularity and with shared legitimate activity. If synthetic data are used, they must also include legitimate convergence; opposing independent agents to agents that copy each other is not enough. The result describes detection of activity associated with the chosen categories; it does not prove intention, causal communication or prevention of an escape.
 
-## 14. Decisiones, ejecución y registro
+## 14. Decisions, execution and logging
 
-El flujo mínimo, sin extensiones, es: **evento → permisos → reglas con memoria → decisión y registro**. En la reproducción de la wiki se emite una decisión retrospectiva sin ejecutar el contenido. En las pruebas del ejecutor y en la integración real, se decide antes de invocar la herramienta y se registra también el resultado cuando llega a ejecutarse.
+The minimum flow, without extensions, is: **event → permissions → memory rules → decision and log**. In the wiki replay a retrospective decision is emitted without executing the content. In the executor tests and in the real integration, the decision is made before invoking the tool and the result is also logged when it gets executed.
 
-Si se activa el análisis colectivo, este aporta señales junto al individual, según el esquema de la sección 3. Si se activa el revisor, recibe un único caso con las evidencias disponibles. Sin revisor, las llamadas que cumplen las reglas y no requieren revisión siguen pasando; las señales meramente informativas generan avisos. Una revisión obligatoria sin revisor disponible mantiene la llamada retenida; no se inventa una aprobación del modelo.
+If collective analysis is enabled, it contributes signals alongside the individual one, per the diagram in section 3. If the reviewer is enabled, it receives a single case with the available evidence. Without a reviewer, calls that meet the rules and do not require review keep passing; merely informative signals generate warnings. A mandatory review with no reviewer available keeps the call held; a model approval is not invented.
 
-| Respuesta | Efecto en un ejecutor; en la wiki se registra lo que habría decidido                                                                  |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Permitir  | Ejecutar y registrar. «Normal» significa que no incumple las comprobaciones activas, no que se haya demostrado inocua.                |
-| Avisar    | Ejecutar y registrar una advertencia, solo si la regla admite continuar.                                                              |
-| Retener   | No ejecutar mientras falta una revisión requerida. Si no hay revisor disponible, devolver estado pendiente; no pasar silenciosamente. |
-| Bloquear  | No ejecutar esa llamada y registrar el criterio explícito.                                                                            |
+| Response | Effect in an executor; in the wiki what it would have decided is recorded                                                    |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Allow    | Execute and log. "Normal" means it does not violate the active checks, not that it has been shown harmless.                  |
+| Warn     | Execute and log a warning, only if the rule admits continuing.                                                               |
+| Hold     | Do not execute while a required review is missing. If no reviewer is available, return pending status; do not pass silently. |
+| Block    | Do not execute that call and log the explicit criterion.                                                                     |
 
-Bloquear una llamada y terminar toda la ejecución son acciones distintas. El mínimo bloquea llamadas; cortar un `run` completo necesita una regla expresa y una prueba de ese comportamiento. Ningún veredicto borra el historial ni modifica automáticamente los permisos.
+Blocking a call and terminating the whole run are different actions. The minimum blocks calls; cutting off a whole `run` needs an express rule and a test of that behavior. No verdict erases the history or automatically modifies the permissions.
 
-El log JSONL incluye evento, IDs, versión de política, reglas aplicadas, decisión, motivo, evidencia usada, duración de la comprobación y estado de ejecución. No se copian secretos ni cuerpos completos por defecto; se conservan referencias suficientes para revisar los ejemplos autorizados.
+The JSONL log includes event, IDs, policy version, rules applied, decision, reason, evidence used, check duration and execution status. Secrets and full bodies are not copied by default; enough references are kept to review the authorized examples.
 
-## 15. Implementación de la parte 2 y frontera del control
+## 15. Implementation of part 2 and boundary of the control
 
-Programa local, política YAML, dataset de entrada y resultados JSONL. Hay dos recorridos: la reproducción histórica de la wiki, sin ejecutar su contenido, y una demo guionizada con herramientas locales que demuestra trabajo legítimo y veto real. No necesita un agente real intentando escapar ni llamadas a un LLM. El adaptador envuelve la ejecución de herramientas; una integración con LangGraph puede reutilizarlo sin exigir un servicio web, base de datos ni plataforma de observabilidad.
+Local program, YAML policy, input dataset and JSONL results. There are two paths: the historical replay of the wiki, without executing its content, and a scripted demo with local tools that demonstrates legitimate work and a real veto. It needs neither a real agent trying to escape nor calls to an LLM. The adapter wraps tool execution; an integration with LangGraph can reuse it without requiring a web service, database or observability platform.
 
-El portero, sus IDs y su política deben quedar fuera del alcance de escritura del agente. La demostración declara qué herramientas pasan por el control y prueba que las llamadas bloqueadas no llegan al ejecutor. No se afirma proteger vías que no atraviesan ese punto ni procesos autónomos ya lanzados.
+The gatekeeper, its IDs and its policy must remain outside the agent's write reach. The demonstration declares which tools go through the control and proves that blocked calls do not reach the executor. It does not claim to protect paths that do not go through that point or autonomous processes already launched.
 
-La evidencia para terceros es la política, su origen, el adaptador, casos reproducibles y resultados con referencias. Eso permite revisar el artefacto sin entrar en una red de laboratorio; no certifica la contención de un laboratorio real.
+The evidence for third parties is the policy, its origin, the adapter, reproducible cases and results with references. That allows reviewing the artifact without entering a lab network; it does not certify the containment of a real lab.
 
-Una cadena de hashes por sí sola no impide que quien controla el log lo trunque o lo regenere. No es requisito del mínimo ni se presenta como garantía de integridad. Un sistema de atestación con anclaje externo quedaría para otro alcance.
+A hash chain on its own does not prevent whoever controls the log from truncating or regenerating it. It is not a requirement of the minimum nor is it presented as an integrity guarantee. An attestation system with external anchoring would be left for another scope.
 
-## 16. Evaluación de la parte 2
+## 16. Evaluation of part 2
 
-### Cómo se construye el conjunto de pruebas
+### How the test set is built
 
-Los casos se agrupan por qué capa debería pararlos, y se construyen en este orden.
+The cases are grouped by which layer should stop them, and are built in this order.
 
-**Primero, los que debe parar la capa 1.** La llamada no está en la lista de permitidas, y se ve mirando una sola llamada. Cada revisión utilizable de la wiki se representa como la operación adaptada `wiki.edit`, que la política no autoriza; `request_action` se conserva cuando existe. Se espera bloquear las 13.661 ediciones, incluida la primera de cada ID; ese resultado está pendiente de ejecutar la reproducción.
+**First, those layer 1 must stop.** The call is not on the allowlist, and it is visible looking at a single call. Each usable wiki revision is represented as the adapted operation `wiki.edit`, which the policy does not authorize; `request_action` is kept when it exists. The 13,661 edits are expected to be blocked, including the first of each ID; that result is pending running the replay.
 
-**Segundo, los que la capa 1 no puede parar.** Cada llamada por separado está permitida, pero la secuencia incumple la restricción que se concrete para la tarea propia en fase 2. El caso previsto gira alrededor de las esperas entre rondas; su condición y sus parámetros siguen pendientes, y repetir una llamada no basta por sí solo para justificar un bloqueo. Los casos los escribimos nosotros para comprobar el aporte de la memoria.
+**Second, those layer 1 cannot stop.** Each call separately is permitted, but the sequence violates the restriction to be specified for our own task in phase 2. The planned case revolves around the waits between rounds; its condition and parameters are still pending, and repeating a call is not on its own enough to justify a block. The cases are written by us to check the contribution of memory.
 
-**Tercero, los que no debe parar nadie.** Trabajo normal de un agente haciendo lo que le mandaron. Miden si el portero estorba, que es la mitad de la pregunta que guía el proyecto. Los escribimos nosotros como parte de la escena de investigación acordada.
+**Third, those nobody should stop.** Normal work of an agent doing what it was told. They measure whether the gatekeeper gets in the way, which is half of the question guiding the project. We write them as part of the agreed research scenario.
 
-El segundo y el tercer grupo se declaran como material propio. No dan una tasa general de falsos positivos ni de detección: prueban comportamiento en esos casos concretos, y así se informa.
+The second and third groups are declared as our own material. They do not give a general false-positive or detection rate: they test behavior in those specific cases, and that is how it is reported.
 
-### Pruebas del portero
+### Gatekeeper tests
 
-- Una llamada permitida se ejecuta y deja resultado.
-- Una llamada prohibida por permisos no invoca la herramienta ni produce su efecto.
-- Un límite con memoria permite las acciones dentro del presupuesto y bloquea la siguiente que lo supera, incluyendo intentos simultáneos.
-- Los IDs mantienen memorias separadas. El agente no puede cambiar su ID o política mediante argumentos.
-- Datos imprescindibles ausentes y revisiones pendientes no se convierten en permiso silencioso.
+- A permitted call executes and leaves a result.
+- A call prohibited by permissions does not invoke the tool nor produce its effect.
+- A memory limit allows the actions within the budget and blocks the next one that exceeds it, including simultaneous attempts.
+- IDs keep separate memories. The agent cannot change its ID or policy through arguments.
+- Missing essential data and pending reviews do not turn into silent permission.
 
-Las pruebas se escriben antes de implementar cada comportamiento. Verifican restricciones concretas, no que el código repita su propia fórmula.
+Tests are written before implementing each behavior. They verify concrete restrictions, not that the code repeats its own formula.
 
-### Comparación de capa 1 frente a capas 1+2
+### Comparison of layer 1 against layers 1+2
 
-Comparar **capa 1 sola** con **capas 1+2** sobre los mismos escenarios y políticas compatibles. Para cada regla registrar qué caso cubre, su origen, qué necesita observar y su coste.
+Compare **layer 1 alone** with **layers 1+2** over the same scenarios and compatible policies. For each rule record which case it covers, its origin, what it needs to observe and its cost.
 
-Medir acciones indebidas impedidas en los casos etiquetados, acciones legítimas bloqueadas, ejecuciones legítimas que terminan la tarea, avisos y retenciones, y tiempo de comprobación por llamada. Mostrar cantidades y denominadores, no solo porcentajes. La ausencia de falsas alarmas en unas pocas pruebas no demuestra una tasa nula general.
+Measure improper actions prevented in the labeled cases, legitimate actions blocked, legitimate runs that finish the task, warnings and holds, and check time per call. Show counts and denominators, not only percentages. The absence of false alarms in a few tests does not prove a general zero rate.
 
-La capa 1 bloquea todas las ediciones observadas, porque ninguna está en la lista de llamadas permitidas. **Eso no demuestra que las capas 2, 3 o 4 añadan prevención, y se dice así.** Sobre el corpus no hay forma de medir qué añade la memoria, porque la primera llamada de cada agente ya cae; eso se mide en el programa de prueba local, con sus parámetros declarados de antemano. No se modifica la política a escondidas para dar trabajo a las capas adicionales.
+Layer 1 blocks all observed edits, because none is on the list of permitted calls. **That does not prove that layers 2, 3 or 4 add prevention, and it is said that way.** Over the corpus there is no way to measure what memory adds, because each agent's first call already falls; that is measured in the local test program, with its parameters declared in advance. The policy is not quietly modified to give the additional layers work.
 
-### Uso de los datos históricos
+### Use of the historical data
 
-Reproducir la wiki cronológicamente y registrar qué habría decidido cada política sobre las ediciones evaluables. Es un resultado retrospectivo sobre escrituras observadas y supuestos declarados, no una demostración de que el incidente completo se habría evitado.
+Replay the wiki chronologically and record what each policy would have decided over the evaluable edits. It is a retrospective result over observed writes and declared assumptions, not a demonstration that the whole incident would have been avoided.
 
-Si se sigue recorriendo el archivo después de un bloqueo hipotético, **lo que viene después es la continuación histórica, no lo que el agente habría hecho tras recibir el bloqueo.** De esa continuación no se deducen tareas completadas ni daños evitados.
+If the archive keeps being walked after a hypothetical block, **what comes afterwards is the historical continuation, not what the agent would have done after receiving the block.** From that continuation no completed tasks or avoided damage are deduced.
 
-No se ejecutan URLs, instrucciones ni código del corpus. Los efectos de las herramientas se comprueban en entornos propios y controlados. Los ejemplos basados en Hugging Face se etiquetan como casos de prueba inspirados en sus muestras, no como su traza original.
+No URLs, instructions or code from the corpus are executed. The effects of the tools are checked in our own controlled environments. Examples based on Hugging Face are labeled as test cases inspired by its samples, not as its original trace.
 
-La capa 4, si se implementa, añade precisión, cobertura y momento del aviso por página en el conjunto con etiquetas utilizables. La capa 3 añade errores corregidos e introducidos, retenciones y coste frente a no usarla. Cada añadido debe mostrar qué mejora y qué empeora.
+Layer 4, if implemented, adds precision, coverage and moment of the warning per page on the set with usable labels. Layer 3 adds errors corrected and introduced, holds and cost versus not using it. Each addition must show what it improves and what it worsens.
 
-## 17. Trabajo y entregables para 12 horas
+## 17. Work and deliverables for 12 hours
 
-La secuencia técnica y los criterios de cierre viven en la sección 11 del [PRD](../PRD.md): **1. dataset único y limpio → 2. escenario y política → 3. portero y ejecutor → 4. memoria → 5. demo, reproducción y resultados**. La sección 11 de este diseño describe el mismo recorrido; las pruebas acompañan cada fase. No se reduce el proyecto a preparar datos.
+The technical sequence and the closing criteria live in section 11 of the [PRD](../PRD.md): **1. single clean dataset → 2. scenario and policy → 3. gatekeeper and executor → 4. memory → 5. demo, replay and results**. Section 11 of this design describes the same path; tests accompany each phase. The project is not reduced to preparing data.
 
-| Trabajo | Presupuesto orientativo |
-| ------- | ----------------------- |
-| Las cinco fases técnicas: datos, escenario, portero, memoria y resultados reproducibles. | 8 h en total |
-| Entrega documental: matriz de Hugging Face, diseño de la parte 1, informe escrito por el equipo, limitaciones, referencias y empaquetado. | 4 h en total |
+| Work                                                                                                                         | Indicative budget |
+| ---------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| The five technical phases: data, scenario, gatekeeper, memory and reproducible results.                                      | 8 h in total      |
+| Documentary delivery: Hugging Face matrix, part 1 design, report written by the team, limitations, references and packaging. | 4 h in total      |
 
-La matriz control × fase pertenece al análisis documental de Hugging Face y sigue siendo obligatoria. No es una fase de código ni una dependencia para preparar el dataset o implementar el portero; puede prepararse en paralelo. Los resultados medidos se incorporan al informe cuando termine la fase técnica correspondiente.
+The control × phase matrix belongs to the documentary analysis of Hugging Face and remains mandatory. It is not a code phase nor a dependency for preparing the dataset or implementing the gatekeeper; it can be prepared in parallel. The measured results are incorporated into the report when the corresponding technical phase finishes.
 
-Las capas opcionales no tienen horas reservadas: solo entran si el núcleo y su evaluación terminan antes. Prioridad entre extensiones de la parte 2: **escena de escritura sobre recurso compartido permitido, después capa 4, después capa 3 con casos de tarea conocida, después vídeo o demo con un agente real**. La primera va delante porque reproduce el mecanismo documentado del incidente y cuesta alrededor de una hora sobre el núcleo. No se sacrifica la evaluación de trabajo legítimo ni el informe para añadirlas. El análisis y la matriz de la parte 1 se entregan ahora; su integración con el operador queda como propuesta posterior, fuera de esta implementación.
+The optional layers have no reserved hours: they only come in if the core and its evaluation finish early. Priority among part 2 extensions: **write scenario on a permitted shared resource, then layer 4, then layer 3 with known-task cases, then video or demo with a real agent**. The first goes ahead because it reproduces the incident's documented mechanism and costs about an hour on top of the core. The evaluation of legitimate work and the report are not sacrificed to add them. Part 1's analysis and matrix are delivered now; their integration with the operator remains a later proposal, outside this implementation.
 
-Entregables del proyecto:
+Project deliverables:
 
-1. Política y tabla «regla → origen → restricción → evidencia de prueba → coste».
-2. Portero con IDs, memoria y adaptador a un ejecutor controlado.
-3. Dataset único preparado, reproducción histórica sin ejecutar el corpus, conteos de limpieza y supuestos.
-4. Escenario propio, demo guionizada sin LLM, pruebas y comparación reproducible de capa 1 frente a 1+2; ampliaciones solo si se hicieron.
-5. Informe sobre la plantilla oficial, hasta 8 páginas sin referencias/apéndices, abstract de hasta 150 palabras, autores y apéndice obligatorio de limitaciones y doble uso, según el documento del sprint.
-6. Matriz control × fase de ataque sobre las nueve fases documentadas, con sus supuestos y sus límites declarados.
-7. Diseño de la parte 1: esquema general, datos requeridos, qué no podemos ejecutar y procedimiento para evaluar el caso con información completa, claramente separado de los resultados de la wiki.
+1. Policy and table "rule → origin → restriction → test evidence → cost".
+2. Gatekeeper with IDs, memory and adapter to a controlled executor.
+3. Single prepared dataset, historical replay without executing the corpus, cleaning counts and assumptions.
+4. Our own scenario, scripted demo without LLM, tests and reproducible comparison of layer 1 against 1+2; extensions only if they were done.
+5. Report on the official template, up to 8 pages excluding references/appendices, abstract of up to 150 words, authors and mandatory appendix on limitations and dual use, per the sprint document.
+6. Control × attack-phase matrix over the nine documented phases, with its assumptions and limits declared.
+7. Part 1 design: general diagram, required data, what we cannot run and procedure to evaluate the case with complete information, clearly separated from the wiki results.
 
-Este archivo es el diseño de trabajo, no el informe ni un resultado.
+This file is the working design, not the report or a result.
 
-## 18. Decisiones cerradas y relato del proyecto
+## 18. Closed decisions and project narrative
 
-**Cerrado:** el documento y el informe van primero al caso de referencia y después a la implementación con la wiki. Se implementa ahora la parte 2 y se documenta la parte 1. Capas 1+2 obligatorias y sencillas en el mínimo; 3+4 opcionales. Análisis individual y colectivo al mismo nivel, con señales reunidas para revisión. Nombres como IDs en la wiki e IDs asignados por el ejecutor en el sistema real. Recuperación explícita o exclusión de datos imprescindibles ausentes. Bloqueo por reglas, no por rareza. Evaluación separada de observaciones históricas y llamadas controladas.
+**Closed:** the document and the report go first to the reference case and then to the implementation with the wiki. Part 2 is implemented now and part 1 is documented. Layers 1+2 mandatory and simple in the minimum; 3+4 optional. Individual and collective analysis at the same level, with signals gathered for review. Names as IDs in the wiki and executor-assigned IDs in the real system. Explicit recovery or exclusion of missing essential data. Blocking by rules, not by unusualness. Separate evaluation of historical observations and controlled calls.
 
-**Cerrado en esta revisión:** el ejecutor controlado representa una escena de investigación con las operaciones permitidas y un intento de edición prohibida mediante `wiki.edit`. Las llamadas son guionizadas por nosotros, sin LLM ni gasto de API; el portero y las herramientas locales se ejecutan de verdad. El guion se identifica como material propio: permite verificar trabajo legítimo y ausencia de efecto tras el veto, sin atribuirlo al comportamiento de un modelo. El patrón del tablón sobre la caché de paquetes entra en el informe como análisis dentro de la matriz control × fase, no como demostración implementada; solo se monta como segunda escena si sobra tiempo tras cerrar el núcleo y su evaluación. **La política es una sola y es una lista de las llamadas que la tarea autoriza, con denegación por defecto: lo que no está en la lista se bloquea.** No hay escenario estricto y permisivo; esa pareja venía de cuando el eje era el destino y queda retirada. Las cinco llamadas permitidas salen de la tarea reconstruida. De ExploitGym no se toma nada para el código, incluidos encargos, herramientas y pruebas: solo se usa como contexto documental del control existente para la matriz control × fase. El encargo de las pruebas del ejecutor es una tarea de investigación escrita por nosotros. **La tesis del informe, corregida el 12 de septiembre:** no es que no hubiera controles ni registro. Había identidad, transcripciones y perímetro. Lo que no había era nadie leyendo las transcripciones, el registro estaba donde el agente podía reescribirlo, el canal de coordinación no tenía autenticación y la visibilidad terminaba en el escape del sandbox. Ninguno de los controles preguntaba si una llamada encajaba con el encargo autorizado. El portero es además el punto donde debe producirse el registro de quién hizo qué.
+**Closed in this revision:** the controlled executor represents a research scenario with the permitted operations and a prohibited edit attempt via `wiki.edit`. The calls are scripted by us, without LLM or API spend; the gatekeeper and the local tools actually run. The script is identified as our own material: it allows verifying legitimate work and absence of effect after the veto, without attributing it to a model's behavior. The message-board pattern over the package cache enters the report as analysis within the control × phase matrix, not as an implemented demonstration; it is only set up as a second scenario if time is left after closing the core and its evaluation. **The policy is a single one and it is a list of the calls the task authorizes, with default deny: what is not on the list is blocked.** There is no strict and permissive scenario; that pair came from when the axis was the destination and is withdrawn. The five permitted calls come from the reconstructed task. Nothing is taken from ExploitGym for the code, including tasks, tools and tests: it is only used as documentary context on the existing control for the control × phase matrix. The task for the executor tests is a research task written by us. **The report's thesis, corrected on 12 September:** it is not that there were no controls or logging. There were identity, transcripts and perimeter. What there was not was anyone reading the transcripts, the log was where the agent could rewrite it, the coordination channel had no authentication and visibility ended at the sandbox escape. None of the controls asked whether a call fit the authorized task. The gatekeeper is also the point where the log of who did what must be produced.
 
-**Pendiente de ejecución de la parte 2:** escribir los casos de trabajo legítimo, fijar el parámetro de la regla de capa 2, consultar las versiones de las guías que se citen, implementar, medir y redactar resultados. La implementación del caso con información completa y el acceso a registros de OpenAI quedan fuera del compromiso del hackathon.
+**Pending execution of part 2:** write the legitimate-work cases, set the parameter of the layer 2 rule, check the versions of the guides that are cited, implement, measure and write up results. Implementation of the complete-information case and access to OpenAI logs remain outside the hackathon commitment.
 
-Orden del informe: **el control que existe hoy y sus huecos → el caso de referencia y la matriz → qué datos harían falta y qué no podemos ejecutar → el método implementado con la wiki → resultados y límites**. Siempre separando lo que hicimos, lo que asumimos y lo que proponemos.
+Report order: **the control that exists today and its gaps → the reference case and the matrix → what data would be needed and what we cannot run → the method implemented with the wiki → results and limits**. Always separating what we did, what we assumed and what we propose.
 
-Las fuentes están en [el documento del sprint](ai-incident-response-sprint.md) y en [hallazgos-exploitgym.md](hallazgos-exploitgym.md). **Antes de escribir una afirmación sobre los incidentes se comprueba su fuente primaria**; un resumen anterior no vale como comprobación.
+The sources are in [the sprint document](ai-incident-response-sprint.md) and in [hallazgos-exploitgym.md](hallazgos-exploitgym.md). **Before writing a claim about the incidents its primary source is checked**; an earlier summary does not count as verification.
