@@ -6,7 +6,7 @@ Un portero que comprueba las llamadas a herramienta de un agente antes de ejecut
 
 ## Qué leer antes de tocar nada
 
-- [PRD](.codex/plans/PRD.md): requisitos P0, criterios de aceptación y alcance cerrado.
+- [PRD](PRD.md): requisitos P0, criterios de aceptación y alcance cerrado.
 - [Diseño del proyecto](docs/proyecto-portero-tool-calls.md): parte 1 el caso OpenAI/Hugging Face, parte 2 la implementación con la wiki. Decisiones de método, datos y límites.
 - [Documento del sprint](docs/ai-incident-response-sprint.md): contexto y requisitos de la entrega.
 - [Hallazgos sobre ExploitGym](docs/hallazgos-exploitgym.md) y [de METR y Redwood](docs/hallazgos-metr-redwood.md): evidencia externa, con sus avisos de versión y de fuente.
@@ -18,7 +18,9 @@ Un portero que comprueba las llamadas a herramienta de un agente antes de ejecut
 
 Programa local en **Python**. Política en **YAML**, entradas y salidas en **JSONL**. Sin servicios, sin base de datos, sin web, sin plataforma de observabilidad.
 
-Los datos son ficheros comprimidos en `data/collusion-wiki/`. Son 14.591 filas: `gzip` y `json` de la biblioteca estándar bastan, no hace falta pandas ni ninguna dependencia.
+Dependencias declaradas en `pyproject.toml` y gestionadas con `uv`: **pandas** para el corpus, **PyYAML** para la política, **pytest** para las pruebas. Se instala con `uv sync` y se ejecuta con `uv run`.
+
+Los datos son ficheros comprimidos en `data/collusion-wiki/`. Son 14.591 filas. **No se modifican nunca los originales.**
 
 ## Cómo se trabaja aquí
 

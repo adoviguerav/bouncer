@@ -6,9 +6,7 @@ Track 1 principal. Presupuesto: unas 12 horas de trabajo real.
 **Estado: diseño definido en dos partes con el usuario; implementación y resultados pendientes.**
 Revisión del 11 de septiembre de 2026 contra los archivos locales, los documentos del sprint y el repositorio público de ExploitGym.
 
-**Orden de esta revisión.** El documento va primero al caso OpenAI/Hugging Face, que es lo que pide el Track 1, y marca ahí los huecos del control que hoy se despliega. Después viene la implementación con la wiki, que es la evidencia observable que sí podemos procesar en doce horas y que cae justo en uno de esos huecos.
-
-Ediciones anteriores llamaban **parte 2** a la implementación con la wiki y **parte 1** al caso con información completa. Se renombran a **parte 2** y **parte 1** respectivamente, y se invierte su orden. El alcance de cada una no cambia: se implementa la wiki, se documenta el caso completo.
+Primero el caso OpenAI/Hugging Face, que es lo que pide el Track 1, marcando los huecos del control que hoy se despliega. Después la implementación con la wiki, que es la única evidencia observable procesable en doce horas y que cae justo en uno de esos huecos.
 
 - [Contexto y requisitos del sprint](ai-incident-response-sprint.md).
 - [Hallazgos sobre ExploitGym y su harness](hallazgos-exploitgym.md): el control desplegado en el benchmark del incidente, sus versiones y sus fuentes.
@@ -28,23 +26,43 @@ El Track 1 pregunta qué controles específicos habrían interrumpido la cadena 
 | **1. Caso de referencia — OpenAI/Hugging Face** | Reconstruir qué control existía, dónde falla, qué datos pediríamos al operador y cómo se evaluaría. Matriz control × fase de ataque sobre las nueve fases documentadas.                                | Qué habría visto y qué no cada control sobre las fases documentadas, con sus supuestos declarados. No que dispongamos de las trayectorias ni que hayamos evitado nada. |
 | **2. Implementación — la wiki**                 | Preparar las ediciones, usar los nombres como IDs, aplicar políticas declaradas y reglas con memoria, reproducir el registro y medir decisiones. Una prueba local del ejecutor comprueba el veto real. | Qué decisiones produce el método sobre los datos observados y si el programa hace cumplir sus reglas en pruebas controladas.                                           |
 
-La pregunta que guía ambas partes es: **¿qué restricciones podemos hacer cumplir, qué añade mirar las secuencias o reunir señales y cuánto trabajo legítimo impedimos?** El programa puede reutilizarse; la política y la referencia de comportamiento deben corresponder a cada tarea y entorno.
+La pregunta que guía las dos partes: **¿qué restricciones podemos hacer cumplir, qué añade mirar el historial y cuánto trabajo legítimo impedimos?** El programa se reutiliza; la política es de cada tarea y entorno.
 
 El entregable mínimo de la parte 2 es un portero con reglas de permisos, reglas con memoria por ID, registro de decisiones y pruebas reproducibles sobre una adaptación explícita de la wiki. Puede funcionar sin un LLM supervisor y sin analizar a toda la población. La parte 1 se documenta y no se implementa dentro de las doce horas.
 
-El Track 1 pide controles ejecutables, evidencia verificable y coste de implementación y operación. No exige cuatro capas. Los incidentes motivan el proyecto; su existencia no demuestra que nuestro portero los hubiera detenido ni que cada extensión sea necesaria.
+**La demostración del sprint simula la tarea de investigación mediante llamadas guionizadas por nosotros.** El portero y las herramientas locales sí se ejecutan: las lecturas devuelven contenido, el trabajo permitido puede completarse y una edición bloqueada deja la wiki local intacta. Así mostramos el paso de llamada a ejecución sin gastar en LLMs; no se presenta el guion como comportamiento observado de un modelo. El objetivo es un caso de uso verificable con pruebas concretas y las métricas acordadas, sin convertirlo en una evaluación general de agentes.
 
-## 2. Los dos incidentes fallaron en el mismo punto
+El Track 1 pide controles ejecutables, evidencia verificable y coste. No exige cuatro capas. **Que estos incidentes existan no demuestra que nuestro portero los hubiera detenido**, y así se escribe.
 
-**El titular del proyecto, y vale para los dos casos: nadie comprobaba ni registraba las llamadas a herramienta.** Esa es la única fuente de información sobre lo que hace un agente, y en los dos incidentes estaba sin cubrir. En Hugging Face ni siquiera faltaba del todo: había transcripciones, pero las escribía el propio agente y al menos el 7 % estaban falsificadas porque sustituyeron el trozo del sistema que las apunta. En la wiki no hay ni eso, y por eso no existe ningún corpus público de llamadas de agentes en un incidente real.
+## 2. No es que no hubiera controles. Es que nadie miraba, y el registro estaba al alcance del vigilado
 
-Lo que sigue es qué controles sí había, y por qué ninguno cubría ese punto.
+**Corregido el 12 de septiembre contra las fuentes.** Ediciones anteriores de este documento decían que nadie comprobaba ni registraba las llamadas. Es falso y hay que retirarlo: cualquiera que haya leído el informe lo desmonta.
 
-Antes de proponer un control conviene mirar el que ya está desplegado. En este dominio no hay que imaginarlo: **el benchmark en el centro del incidente de julio lo trae implementado.** ExploitGym aísla cada agente en contenedores Docker sobre redes internas sin ruta por defecto a internet, y hace pasar todo el tráfico saliente por un proxy Squid con allowlist. Durante la ejecución del agente, esa allowlist contiene cuatro dominios, todos endpoints de API de modelos: `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com` y `api.together.xyz`. Lo demás recibe 403.
+Lo que **sí** había en el incidente de Hugging Face:
 
-Los detalles, con sus fuentes y sus avisos de versión, están en [hallazgos-exploitgym.md](hallazgos-exploitgym.md).
+- **Identidad de agente puesta por código de confianza.** El harness acuña un `agent_id` y un token con el salt del controlador, y rechaza un token inválido con `HTTP 401`. Los agentes aparecen nombrados uno a uno en la investigación: `PHASEONE10841`, `38148c`, `JAN183411`.
+- **~1.300 transcripciones** con la cadena de pensamiento en bruto, con las acciones y el razonamiento de cada ejecución.
+- **Perímetro**: contenedores sin ruta a internet y proxy con allowlist de cuatro dominios.
 
-Ese control tiene dos huecos, y ninguno de los dos es un descuido.
+Lo que **no** había, que es el hueco de verdad:
+
+| Lo que faltaba | La cita |
+| --- | --- |
+| Nadie leía las transcripciones | «OpenAI did not use a scorer that would review their transcripts» — y los agentes creían que sí, y coordinaron durante días para engañarlo |
+| El registro vivía donde el agente llegaba | Salieron del contenedor y sustituyeron el trozo del sistema que ejecuta las llamadas: «pretend to issue one tool call while actually running an arbitrary other tool call». Al menos 96 transcripciones, ~7 % |
+| El canal de coordinación no tenía autenticación | «Shared board unauthenticated, names can be posted by anyone», escrito por un agente. Ellos mismos se montaron un esquema de firma criptográfica |
+| Los clasificadores estaban apagados | Era una evaluación de capacidad: el modelo estaba «unrestrained by the normal classifiers meant to prevent models from compromising digital infrastructure» |
+| La visibilidad acababa en el escape | «OpenAI detected only the initial sandbox escape; Hugging Face's own forensics reconstructed the rest from recovered logs» |
+
+**El titular del proyecto, entonces, es este: el fallo no fue no tener datos, fue tenerlos, no mirarlos, y guardarlos donde el vigilado podía reescribirlos.** De ahí salen las dos funciones del portero, y la segunda no es opcional: comprobar la llamada antes de ejecutarla, y **producir el registro desde código de confianza**, fuera del alcance de escritura del agente.
+
+En la wiki no hay ni transcripciones, y por eso no existe ningún corpus público de llamadas de agentes en un incidente real.
+
+Detalle y fuentes en [hallazgos-metr-redwood.md](hallazgos-metr-redwood.md) §5.1 y §5.2.
+
+Controles sí había. **El benchmark en el centro del incidente de julio los trae implementados**, así que no hay que imaginárselos. ExploitGym aísla cada agente en contenedores Docker sobre redes internas sin ruta por defecto a internet, y hace pasar todo el tráfico saliente por un proxy Squid con allowlist. Durante la ejecución del agente, esa allowlist contiene cuatro dominios, todos endpoints de API de modelos: `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com` y `api.together.xyz`. Lo demás recibe 403.
+
+Detalles, fuentes y avisos de versión en [hallazgos-exploitgym.md](hallazgos-exploitgym.md). Ese control tiene dos huecos, y ninguno es un descuido.
 
 **Hueco 1: la fase de instalación es allow-all.** El harness usa dos redes y cambia el contenedor de una a otra. Durante la construcción del entorno el proxy permite todo, porque los repositorios de paquetes no se pueden enumerar por adelantado y sin ellos no hay entorno. Es exactamente la razón estructural por la que hubo que permitir el proxy de paquetes en el incidente de julio.
 
@@ -72,7 +90,7 @@ Hubo un segundo fallo, este de acumulación. El reloj de la tarea corría más r
 
 Conservamos la numeración de las cuatro capas para reconocerlas, pero **no son cuatro filtros consecutivos**. Los permisos van primero. El análisis individual (2) y el análisis colectivo (4) son dos maneras de buscar problemas; alimentan la misma revisión del caso (3) cuando se necesita interpretar su significado.
 
-Las capas 1 y 2 pueden vivir en el mismo programa. Que el análisis individual y colectivo estén en paralelo significa que ninguno depende de que el otro encuentre algo. No exige varios servicios, hilos ni llamadas concurrentes.
+Las capas 1 y 2 viven en el mismo programa. «En paralelo» significa que ninguna depende de que la otra encuentre algo, no servicios ni hilos concurrentes.
 
 | Componente                    | Pregunta que responde                                                                      | Implementación con la wiki (parte 2)                                                                                                                     |
 | ----------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -105,9 +123,9 @@ flowchart TD
     H -->|"Información insuficiente o fallo"| J["Mantener pendiente de revisión"]
 ```
 
-**El esquema representa el funcionamiento con llamadas pendientes de ejecutar.** En la parte 2, su entrada principal será una edición que ya ocurrió y su salida una decisión retrospectiva. La prueba con un ejecutor local verifica aparte que el bloqueo impide una ejecución. El gráfico no significa que hayamos recuperado las llamadas originales ni implementado todos sus componentes.
+**El esquema es para llamadas pendientes de ejecutar.** En la wiki la entrada es una edición que ya ocurrió y la salida una decisión retrospectiva; que el bloqueo impide de verdad una ejecución se comprueba aparte, en el ejecutor local. **Ni hemos recuperado las llamadas originales ni está implementado todo lo que sale en el gráfico.**
 
-Un bloqueo duro de 1 o 2 prevalece siempre: no espera ni puede ser levantado por el modelo. Si 2 y 4 aportan sospechas sobre un mismo caso, se reúnen para una sola revisión. La coordinación puede disparar esa revisión aunque ningún ID resulte sospechoso individualmente. Las señales que la política considere solo advertencias se registran sin impedir continuar; si exige revisión, la llamada queda retenida hasta resolverla.
+Un bloqueo de la capa 1 o 2 prevalece siempre: el modelo no puede levantarlo. Si 2 y 4 sospechan del mismo caso, se revisa una sola vez. La coordinación puede pedir esa revisión aunque ningún ID sea sospechoso por separado.
 
 ## Parte 1 — El caso de referencia: OpenAI/Hugging Face
 
@@ -133,11 +151,11 @@ El identificador tiene la forma `{family}:{task_path}/{defense_bitmap}`, con fam
 
 **Una instancia es un encargo, no un registro.** No contiene llamadas, argumentos, tiempos ni trayectoria. Meter 869 instancias por el portero no produce nada evaluable, porque el portero no juzga tareas: juzga llamadas.
 
-Lo que sí resuelven es la mitad que falta en todo el proyecto, que es la autorización. El encargo autorizado es justamente la pieza que la wiki no tiene y por la que la capa 3 queda descartada. Aquí hay encargos reales y citables.
+Estos encargos pertenecen a tareas de explotación, no a la investigación que simulamos. No sustituyen el encargo que escribimos para nuestras pruebas.
 
-**Uso acordado:** ninguno dentro del código. Con `wiki.edit` como única herramienta del ejecutor, un encargo de desarrollo de exploits no encaja: nadie edita una wiki para explotar un CVE. El encargo de las pruebas del ejecutor es una tarea de experimento declarada, escrita por nosotros y etiquetada como tal, con la forma de la tarea de investigación que describe el documento del sprint. Lo que ExploitGym aporta al proyecto es la configuración de sus dos redes como instancias reales de política de destino, y nada más.
+**Uso acordado:** de ExploitGym no se toma nada para el código: ni instancias, ni encargos, ni herramientas, ni pruebas. El encargo y las llamadas de las pruebas los escribimos nosotros para simular la tarea de investigación, con operaciones locales permitidas y una edición de wiki prohibida. ExploitGym aporta contexto documental sobre el control existente para la matriz control × fase.
 
-Queda pendiente comprobar si el texto del encargo de cada instancia se puede leer sin ejecutar el script de preparación de datos del repositorio. La lista de comprobaciones pendientes está en [hallazgos-exploitgym.md](hallazgos-exploitgym.md).
+No hace falta recuperar ni ejecutar encargos de sus instancias para esta entrega.
 
 ## 5. Matriz control × fase de ataque
 
@@ -206,31 +224,27 @@ El encargo, los IDs y los permisos deben proceder del sistema que controla la ej
 4. **Revisión del caso:** reunir las señales individuales y colectivas relevantes junto con la llamada, la tarea y los permisos. Un LLM o clasificador especializado valora si encaja con el encargo, si lo contradice o si falta información. Su decisión no anula restricciones explícitas.
 5. **Respuesta:** permitir, avisar, retener o bloquear según el criterio definido. Registrar la evidencia y la acción realmente tomada. Terminar una ejecución completa requiere una regla específica.
 
-El revisor y el análisis colectivo siguen siendo componentes que deben justificar su utilidad. Tener más datos permite evaluarlos mejor; no los convierte automáticamente en obligatorios. Tampoco obliga a que el juez sea un modelo grande y caro: se comparan candidatos por sus errores, tiempo y recursos, incluidos los casos donde no pueden decidir.
+El revisor y el análisis colectivo tienen que justificar que sirven. Más datos permiten evaluarlos mejor, no los vuelven obligatorios. Y el juez no tiene por qué ser un modelo grande: se comparan candidatos por errores, tiempo y recursos, contando los casos en que no pueden decidir.
 
 ## 8. Aplicación propuesta al caso OpenAI/Hugging Face
 
-La posición que nos interesa es la del operador de los agentes, antes de ejecutar sus herramientas. Pediríamos las trayectorias originales y los encargos de las ejecuciones implicadas. Los agregados y muestras de Hugging Face que ya tenemos aportan contexto, pero no sustituyen ese registro del operador.
+El portero se coloca donde el operador ejecuta las herramientas de sus agentes. Harían falta las trayectorias originales y los encargos de las ejecuciones implicadas; los agregados públicos de Hugging Face dan contexto y no sustituyen ese registro.
 
-Por ejemplo, para estudiar el uso de una salida de red permitida, revisaríamos primero qué operación y argumentos estaban autorizados. Después reuniríamos las llamadas de ese ID y, si otros IDs utilizaron el mismo recurso, el patrón colectivo. Solo con la tarea y el contexto necesarios se pediría al modelo que juzgara un caso dudoso. Es un recorrido propuesto, no una afirmación de que tal secuencia esté disponible o de que ya la hayamos detectado.
+Ejemplo del recorrido, y es una propuesta, no algo que hayamos hecho: para una salida de red permitida, mirar primero qué operación y argumentos estaban autorizados; después las llamadas de ese ID, y el patrón colectivo si otros IDs usaron el mismo recurso; y solo entonces pasar el caso dudoso al modelo, con la tarea delante.
 
-Si se quisiera relacionar las llamadas con efectos observados en Hugging Face, harían falta referencias o correlaciones justificadas con esos registros externos. Una petición HTTP o un proceso observado por la víctima no equivale automáticamente a una llamada única del agente.
-
-El límite del portero sigue siendo su punto de intervención: puede detener llamadas que pasan por él. Una llamada que lanza código autónomo o accede a otra infraestructura requiere además controles sobre ese entorno. No se asegura que inspeccionar la llamada inicial permita observar cada acción posterior.
+Dos límites que no se arreglan con más datos. **Una petición HTTP vista por la víctima no equivale a una llamada del agente**, así que ligar llamadas con efectos en Hugging Face necesita telemetría externa. Y el portero solo detiene lo que pasa por él: una llamada que lanza código autónomo necesita controles en ese otro entorno.
 
 ## 9. Qué haríamos antes de afirmar que funciona en ese caso
 
-Primero comprobaríamos la cobertura de los registros y reproduciríamos las decisiones sobre las llamadas disponibles, declarando los huecos. Compararíamos permisos solos, permisos con memoria y cada añadido individual o colectivo. Para el modelo, mediríamos qué errores corrige y cuáles introduce sobre casos con encargo y decisión de referencia.
+Dos pasos. **Uno:** comprobar qué cubren los registros, reproducir las decisiones sobre las llamadas disponibles y declarar los huecos; comparar permisos solos contra permisos con memoria, y medir qué errores corrige el modelo y cuáles introduce. **Dos:** probar la integración donde las llamadas estén de verdad pendientes, porque la reproducción histórica solo dice qué habría marcado la política sobre una secuencia fija, y una ejecución controlada dice si el veto funciona y qué hace el agente después.
 
-Después probaríamos la integración en un entorno controlado donde las llamadas estén realmente pendientes. La reproducción histórica muestra qué habría marcado la política sobre una secuencia fija; una ejecución controlada muestra si el veto funciona y cómo cambia el comportamiento tras recibirlo. Ninguna de las dos, por sí sola, demuestra un contrafactual completo del incidente.
+Se mediría: acciones indebidas impedidas, tareas legítimas completadas, bloqueos erróneos, avisos, retenciones, demora y coste por llamada. Preparación y evaluación con casos separados.
 
-La evaluación incluiría acciones indebidas impedidas, tareas legítimas completadas, bloqueos erróneos, avisos y retenciones, demora hasta la decisión y coste por llamada. Las particiones de preparación y prueba respetarían ejecuciones y grupos relacionados para no evaluar con copias de los mismos casos usados para ajustar el sistema.
-
-**Resultado esperado de esta fase posterior:** evidencia sobre la utilidad de cada componente con información suficiente, incluyendo la posibilidad de concluir que alguno no aporta valor. Si nunca se obtiene ese acceso, la parte 2 conserva su valor como prueba limitada y reproducible; no se inventan datos para completar la parte 1.
+**Ninguno de los dos pasos demuestra un contrafactual del incidente.** Y si ese acceso no llega nunca, la parte 2 sigue valiendo como prueba limitada y reproducible: no se inventan datos para completar la parte 1.
 
 ## 10. Qué no podemos ejecutar y de dónde saldrían los datos
 
-Si pudiéramos pasar el portero por las trayectorias reales de OpenAI/Hugging Face, ese sería el experimento y la wiki no haría falta. No podemos, y conviene decir exactamente por qué en lugar de dejarlo en que faltan datos.
+Si pudiéramos pasar el portero por las trayectorias reales de OpenAI/Hugging Face, ese sería el experimento y la wiki no haría falta. No podemos, y el porqué exacto importa más que decir «faltan datos».
 
 **Las trayectorias del incidente no son públicas.** Lo que Hugging Face publicó son agregados, conteos por fase y una muestra ilustrativa. El registro de llamadas con sus argumentos, IDs y tiempos está en el operador de los agentes.
 
@@ -241,7 +255,7 @@ Por tanto, si en algún momento hicieran falta trayectorias para esta parte, sal
 1. **Del operador**, con los datos de la sección 6. Es la vía correcta y la que se pide en esa lista.
 2. **De ejecutar el harness con el portero interpuesto**, en un entorno con autorización explícita y fuera de este presupuesto, o de una ejecución publicada por un tercero con trayectorias utilizables.
 
-Lo que sí hacemos con material público y sin coste: leer y citar la configuración del control existente, construir la matriz de la sección 5 con los agregados, e imitar la superficie de herramientas del harness en nuestro ejecutor. Todo ello queda etiquetado como material propio inspirado en el caso, nunca como su traza original.
+Lo que sí hacemos con material público y sin coste: leer y citar la configuración del control existente y construir la matriz de la sección 5 con los agregados. El ejecutor local simula la tarea de investigación con un encargo y llamadas propios; no imita la superficie de herramientas del harness ni reproduce su traza original.
 
 ### 10.1. Por qué no hay datos, y qué se deduce de eso
 
@@ -250,7 +264,7 @@ Buscamos datasets públicos de incidentes de agentes. Los hay, y ninguno sirve c
 | Fuente                                 | Qué es                                                     | ¿Trae las acciones del agente?                                             |
 | -------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
 | AI Incident Database                   | 962 incidentes, 4.743 informes                             | No. Relato en prosa y taxonomía.                                           |
-| Documented AI Agent Incidents, de METR | 44 incidentes puntuados por exceso de alcance y ocultación | Sin comprobar. Es la única duda que queda abierta.                         |
+| Documented AI Agent Incidents, de METR | 44 incidentes puntuados por exceso de alcance y ocultación | Sin comprobar; antecedente fuera del compromiso del sprint.              |
 | RealHarm                               | 136 casos, 68 inseguros y 68 seguros                       | No. Conversaciones de chatbot, y los seguros son los inseguros reescritos. |
 | Reconstrucción de Hugging Face         | 17.613 acciones                                            | No. Conteos por fase y 21 ejemplos.                                        |
 | Wiki de este repositorio               | 13.661 ediciones                                           | Lo más cerca que hay, y son ediciones guardadas, no llamadas.              |
@@ -331,24 +345,24 @@ Se procesa por tiempo y se conserva su procedencia e incertidumbre. Si varias re
 
 La matriz control × fase de la sección 5 se construye con estos mismos agregados y hereda todos sus límites. Estos datos sirven para eso, para contextualizar el incidente y preparar casos de prueba propios inspirados en acciones documentadas, con sus supuestos visibles. No permiten afirmar «el portero habría cortado exactamente en la llamada 272» ni fijar un horizonte real de visibilidad en la llamada 600. No se interpolan horas para evaluar patrones temporales.
 
-### 11.5. Ejemplos de trabajo correcto: pendiente
+### 11.5. Ejemplos de trabajo correcto: casos propios
 
 **Qué es esto.** La wiki son 13.661 ediciones y todas son del incidente. Si solo probamos el portero contra ese corpus, una regla que bloquee todo acierta el 100 % y no sirve para nada, porque también pararía a un agente haciendo su trabajo. Hace falta el grupo de control: agentes trabajando bien, para contar cuántos bloqueamos por error. Los documentos del proyecto lo llaman «carga legítima».
 
-Los documentos mencionan trazas públicas, pero **no hay un corpus benigno seleccionado y descargado en este repositorio**. La existencia de un catálogo o de JSONL no resuelve su adecuación.
+**La vía elegida para el sprint es escribir casos propios de investigación, con encargo, llamadas guionizadas y resultados esperados.** Incluyen trabajo permitido que debe completarse y un intento de editar la wiki que debe bloquearse. No dependen de encontrar ni descargar un corpus externo. Se separan los ejemplos usados para preparar reglas de los usados para evaluarlas.
 
-**Dos candidatos localizados el 11 de septiembre de 2026**, ninguno descargado porque el proxy de esta sesión bloquea `huggingface.co` por WebFetch, curl y git:
+**Antecedentes fuera del compromiso del sprint:** dos candidatos localizados el 11 de septiembre de 2026, ninguno descargado entonces porque el proxy de aquella sesión bloqueaba `huggingface.co` por WebFetch, curl y git:
 
 | Candidato                    | Qué contiene                                                                                                                                                | Por qué encaja                                                                                     |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `trace-commons/agent-traces` | Sesiones por harness (claude_code, codex, cursor, opencode y otros) con campos `harness`, `session_id`, `prompt`, `messages`, `tools`, `trace`, `metadata`. | Trae identidad de sesión, encargo y llamadas con argumentos: las tres cosas que pide esta sección. |
 | `CyCraftAI/TraceSafe`        | `golden_0_benign.jsonl`, 90 trazas benignas de referencia sin mutación, de un trabajo sobre guardarraíles en trayectorias de llamadas a herramienta.        | Ya está etiquetado como línea base benigna.                                                        |
 
-Hay que comprobar licencia, esquema real y adecuación antes de darlos por válidos. Antes de medir falsas alarmas hay que elegir trazas con tarea conocida, identidad de sesión, acciones y argumentos suficientes. Las reglas deben corresponder a esas tareas. Se separan los ejemplos usados para preparar reglas de los usados para evaluarlas.
+Su licencia, esquema real y adecuación no están verificados. Quedan como antecedentes; investigarlos no es una tarea pendiente de esta entrega.
 
-Las instancias de ExploitGym **no resuelven esto**. Aportan el encargo autorizado, que es la mitad que faltaba, pero un encargo no es una acción: el repositorio no publica ejecuciones y sin trayectorias no hay carga con la que medir falsas alarmas. Y con `wiki.edit` como única herramienta tampoco encajan como encargo de las pruebas.
+Las instancias de ExploitGym **no se usan** para escribir el encargo, las llamadas ni las pruebas. Nuestra escena sigue la tarea de investigación descrita en este documento.
 
-Si no conseguimos trazas adecuadas dentro del plazo, usamos tareas legítimas propias y controladas sobre encargos reales tomados de esas instancias, y declaramos su alcance reducido. Eso prueba comportamiento en esos casos; no justifica una tasa general de falsos positivos. No se presenta «wiki del incidente frente a otro corpus» como prueba suficiente de detección de ataques: podría distinguir simplemente las fuentes.
+Los casos propios prueban comportamiento en esas situaciones concretas; no justifican una tasa general de falsos positivos ni muestran cómo reaccionaría un LLM tras un bloqueo. No se presenta «wiki del incidente frente a otro corpus» como prueba suficiente de detección de ataques: podría distinguir simplemente las fuentes.
 
 ## 12. Registro del experimento y correspondencia con el sistema real
 
@@ -369,7 +383,7 @@ El registro común incluye:
 
 En cada evento se distingue lo observado de lo asignado al experimento: el nombre y la hora proceden de la wiki; el ID de reproducción, la política de escenario y la representación `wiki.edit` los añade nuestro programa. El encargo original desconocido no se rellena con una etiqueta de página ni con una explicación escrita por un modelo.
 
-Esto no es una propuesta nuestra: el harness del caso ya genera por tarea un `agent_id` y un token derivados del task info y un salt del controlador, es decir, identidad puesta por código de confianza. Y aun así no había ninguna comprobación en el punto de la llamada. Asignar un ID permite atribuir llamadas. No sustituye restringir credenciales, permisos y destinos. Si una integración mezcla agentes sin indicar quién produjo cada llamada, hay que corregir esa integración; el portero no lo deduce del contenido.
+**Esto no es propuesta nuestra:** el harness del caso ya genera por tarea un `agent_id` y un token desde el controlador, o sea identidad puesta por código de confianza — y aun así no había ninguna comprobación en la llamada. Asignar un ID sirve para atribuir, no sustituye restringir credenciales y permisos. Si una integración mezcla agentes sin decir quién hizo cada llamada, se arregla la integración: el portero no lo adivina del contenido.
 
 ## 13. Cómo funciona cada capa
 
@@ -377,9 +391,9 @@ Esto no es una propuesta nuestra: el harness del caso ya genera por tarea un `ag
 
 **Entrada:** llamada actual y política asignada a esa ejecución.
 
-**Operación:** comprobar herramientas permitidas, tipos y valores de argumentos, operación, destinos y rutas autorizadas. Las reglas se guardan en YAML con identificador, explicación, origen y respuesta al incumplimiento.
+**Operación:** buscar la llamada en la lista de permitidas y comprobar sus argumentos. Si no está, se bloquea. Las reglas viven en YAML con identificador, origen, datos que necesitan y respuesta.
 
-Las comprobaciones deben corresponder a lo que se ejecuta realmente: mismo destino y argumentos validados, sin permitir que una redirección o un intermediario conviertan un permiso limitado en acceso arbitrario. El alcance depende de las herramientas integradas; mirar el nombre de una herramienta que ejecuta código no permite controlar automáticamente todas las acciones internas de ese código.
+**Se comprueba lo que se ejecuta de verdad,** no lo que parece: el destino y los argumentos ya validados, sin que una redirección o un intermediario conviertan un permiso estrecho en acceso libre. Y el alcance llega hasta donde llegan las herramientas integradas: aprobar una herramienta que ejecuta código no controla lo que ese código haga por dentro.
 
 **Salida:** permiso o bloqueo, ID de la regla y motivo. Si faltan datos para evaluar una regla en el análisis histórico, se registra «no evaluable»; no se cuenta como acierto ni como acción legítima. En ejecución real, la falta de identidad o datos imprescindibles impide ejecutar la llamada.
 
@@ -399,7 +413,7 @@ Esa es la diferencia entre un portero y un filtro. Un filtro necesita acertar de
 
 **Dónde queda la allowlist de destinos del harness.** Donde le corresponde: es el control que ya existía, y está en la sección 2 y en la matriz de la sección 5, no como política nuestra. Sirve para comparar qué ve el perímetro y qué ve una comprobación en la llamada. Nunca afirmamos que fuera la política que tenían los agentes de la wiki, porque no lo sabemos.
 
-**Qué bloquea esto sobre el corpus.** Las 13.661 ediciones utilizables llegan como `form_edit`, que no está en la lista. Se bloquean las 13.661, en la primera llamada de cada uno de los 3.099 agentes, y las capas siguientes no reciben nada. Es un resultado por sí mismo: el control habría cortado esta actividad en la primera llamada. Va acompañado siempre del matiz de la sección 2: controles había, y aun así no vieron nada.
+**Qué se espera bloquear sobre el corpus.** Cada revisión utilizable se representa como la operación adaptada `wiki.edit`, que la política no autoriza; `request_action` se conserva cuando existe. El resultado esperado, pendiente de ejecutar la reproducción, es bloquear las 13.661 ediciones, incluida la primera de cada uno de los 3.099 IDs, sin que las capas siguientes reciban llamadas autorizadas. Es una expectativa sobre nuestra adaptación y política, con los límites de la sección 2; no demuestra la intervención sobre las llamadas originales.
 
 **Qué NO mide el corpus.** Si el portero estorba. La wiki solo apuntó lo que le llegó a la wiki, es decir, solo las llamadas que la lista bloquea; las permitidas ocurrieron y no están registradas en ninguna parte. Esa mitad de la pregunta se mide en el programa de prueba local, con casos declarados como material propio.
 
@@ -482,11 +496,11 @@ Una cadena de hashes por sí sola no impide que quien controla el log lo trunque
 
 Los casos se agrupan por qué capa debería pararlos, y se construyen en este orden.
 
-**Primero, los que debe parar la capa 1.** La llamada no está en la lista de permitidas, y se ve mirando una sola llamada. La wiki es este caso con datos reales: 13.661 ediciones que llegan como `form_edit`, una llamada que la tarea no autoriza, con bloqueo en la primera de cada ID.
+**Primero, los que debe parar la capa 1.** La llamada no está en la lista de permitidas, y se ve mirando una sola llamada. Cada revisión utilizable de la wiki se representa como la operación adaptada `wiki.edit`, que la política no autoriza; `request_action` se conserva cuando existe. Se espera bloquear las 13.661 ediciones, incluida la primera de cada ID; ese resultado está pendiente de ejecutar la reproducción.
 
 **Segundo, los que la capa 1 no puede parar.** Cada llamada por separado está permitida, y el problema solo aparece al sumarlas: un destino, luego otro, luego otro. Son los que le dan trabajo a la capa 2. **Si no metemos casos así, el experimento no responde a su propia pregunta**, porque nunca sabremos si la memoria aporta algo. Los escribimos nosotros.
 
-**Tercero, los que no debe parar nadie.** Trabajo normal de un agente haciendo lo que le mandaron. Miden si el portero estorba, que es la mitad de la pregunta que guía el proyecto. Los escribimos nosotros mientras no aparezca un conjunto público adecuado.
+**Tercero, los que no debe parar nadie.** Trabajo normal de un agente haciendo lo que le mandaron. Miden si el portero estorba, que es la mitad de la pregunta que guía el proyecto. Los escribimos nosotros como parte de la escena de investigación acordada.
 
 El segundo y el tercer grupo se declaran como material propio. No dan una tasa general de falsos positivos ni de detección: prueban comportamiento en esos casos concretos, y así se informa.
 
@@ -498,7 +512,7 @@ El segundo y el tercer grupo se declaran como material propio. No dan una tasa g
 - Los IDs mantienen memorias separadas. El agente no puede cambiar su ID o política mediante argumentos.
 - Datos imprescindibles ausentes y revisiones pendientes no se convierten en permiso silencioso.
 
-Se escriben las pruebas antes de implementar cada comportamiento y se ejecuta la suite del núcleo. Los casos positivos y negativos verifican restricciones concretas, no que el código repita una fórmula propia.
+Las pruebas se escriben antes de implementar cada comportamiento. Verifican restricciones concretas, no que el código repita su propia fórmula.
 
 ### Comparación de versiones
 
@@ -512,7 +526,7 @@ La capa 1 bloquea todas las ediciones observadas, porque ninguna está en la lis
 
 Reproducir la wiki cronológicamente y registrar qué habría decidido cada política sobre las ediciones evaluables. Es un resultado retrospectivo sobre escrituras observadas y supuestos declarados, no una demostración de que el incidente completo se habría evitado.
 
-Si se sigue recorriendo el archivo después de un bloqueo, las acciones siguientes son la continuación histórica observada, no lo que habría hecho el agente al recibir ese bloqueo. Se distingue ese análisis de una ejecución real detenida. La memoria cuenta intentos o ejecuciones según la regla y el modo declarado; no se deducen tareas completadas ni daños evitados de esa continuación.
+Si se sigue recorriendo el archivo después de un bloqueo hipotético, **lo que viene después es la continuación histórica, no lo que el agente habría hecho tras recibir el bloqueo.** De esa continuación no se deducen tareas completadas ni daños evitados.
 
 No se ejecutan URLs, instrucciones ni código del corpus. Los efectos de las herramientas se comprueban en entornos propios y controlados. Los ejemplos basados en Hugging Face se etiquetan como casos de prueba inspirados en sus muestras, no como su traza original.
 
@@ -522,12 +536,12 @@ La capa 4, si se implementa, añade precisión, cobertura y momento del aviso po
 
 | Bloque | Trabajo                                                                                                                                                                                      | Presupuesto orientativo |
 | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| 1      | Verificar el corpus y sus conteos; fijar las dos políticas desde la configuración publicada del harness; cerrar la matriz control × fase; seleccionar encargos y casos legítimos/prohibidos. | 2 h                     |
+| 1      | Verificar el corpus y sus conteos; escribir la lista de llamadas autorizadas a partir de la tarea reconstruida; cerrar la matriz control × fase; seleccionar casos legítimos y prohibidos. | 2 h                     |
 | 2      | Adaptador, IDs, capa 1, memoria y reglas de capa 2, registro y pruebas incrementales.                                                                                                        | 4 h                     |
 | 3      | Ejecutar comparaciones, revisar errores, producir tabla o figura reproducible y medir coste.                                                                                                 | 2 h                     |
 | 4      | Informe escrito por el equipo, limitaciones, referencias y empaquetado del artefacto.                                                                                                        | 4 h                     |
 
-La matriz control × fase entra en el bloque 1 y no en el informe, por dos razones: sus parámetros se fijan antes de evaluar nada, como el resto de la política, y si el bloque 4 se desborda no puede llevarse por delante el artefacto que el track pide de forma más explícita.
+La matriz va en el bloque 1 y no en el informe por dos motivos: sus parámetros se fijan antes de evaluar nada, como el resto de la política, y si el bloque 4 se desborda no puede arrastrar consigo el artefacto que el track pide de forma más explícita.
 
 Las capas opcionales no tienen horas reservadas: solo entran si el núcleo y su evaluación terminan antes. Prioridad entre extensiones de la parte 2: **escena de escritura sobre recurso compartido permitido, después capa 4, después capa 3 con casos de tarea conocida, después vídeo o demo con un agente real**. La primera va delante porque reproduce el mecanismo documentado del incidente y cuesta alrededor de una hora sobre el núcleo. No se sacrifica la evaluación de trabajo legítimo ni el informe para añadirlas. La parte 1 se entrega como diseño posterior, no como otra implementación dentro de este presupuesto.
 
@@ -541,16 +555,16 @@ Entregables del proyecto:
 6. Matriz control × fase de ataque sobre las nueve fases documentadas, con sus supuestos y sus límites declarados.
 7. Diseño de la parte 1: esquema general, datos requeridos, qué no podemos ejecutar y procedimiento para evaluar el caso con información completa, claramente separado de los resultados de la wiki.
 
-Este archivo es el diseño de trabajo, no el informe de investigación ni un resultado experimental. La redacción de la entrega corresponde al equipo conforme a las reglas del sprint. La publicación y cualquier revisión de divulgación se tramitan cuando exista un artefacto concreto; no forman parte de esta edición del plan.
+Este archivo es el diseño de trabajo, no el informe ni un resultado.
 
 ## 18. Decisiones cerradas y relato del proyecto
 
 **Cerrado:** el documento y el informe van primero al caso de referencia y después a la implementación con la wiki. Se implementa ahora la parte 2 y se documenta la parte 1. Capas 1+2 obligatorias y sencillas en el mínimo; 3+4 opcionales. Análisis individual y colectivo al mismo nivel, con señales reunidas para revisión. Nombres como IDs en la wiki e IDs asignados por el ejecutor en el sistema real. Recuperación explícita o exclusión de datos imprescindibles ausentes. Bloqueo por reglas, no por rareza. Evaluación separada de observaciones históricas y llamadas controladas.
 
-**Cerrado en esta revisión:** el ejecutor controlado usa una sola herramienta, `wiki.edit`, y una sola escena. El patrón del tablón sobre la caché de paquetes entra en el informe como análisis dentro de la matriz control × fase, no como demostración implementada; solo se monta como segunda escena si sobra tiempo tras cerrar el núcleo y su evaluación. **La política es una sola y es una lista de las llamadas que la tarea autoriza, con denegación por defecto: lo que no está en la lista se bloquea.** No hay escenario estricto y permisivo; esa pareja venía de cuando el eje era el destino y queda retirada. Las cinco llamadas permitidas salen de la tarea reconstruida. No se ejecuta ExploitGym y sus instancias no entran en el código: de ese repositorio se usa la configuración de sus dos redes como lo que es, el control perimetral que ya existía, dentro de la matriz control × fase. El encargo de las pruebas del ejecutor es una tarea de experimento declarada. La tesis del informe es que ninguno de los controles existentes pregunta si una llamada encaja con el encargo autorizado ni mira las herramientas propias del agente, y que el portero es además el punto donde debe producirse el registro de quién hizo qué.
+**Cerrado en esta revisión:** el ejecutor controlado representa una escena de investigación con las operaciones permitidas y un intento de edición prohibida mediante `wiki.edit`. Las llamadas son guionizadas por nosotros, sin LLM ni gasto de API; el portero y las herramientas locales se ejecutan de verdad. El guion se identifica como material propio: permite verificar trabajo legítimo y ausencia de efecto tras el veto, sin atribuirlo al comportamiento de un modelo. El patrón del tablón sobre la caché de paquetes entra en el informe como análisis dentro de la matriz control × fase, no como demostración implementada; solo se monta como segunda escena si sobra tiempo tras cerrar el núcleo y su evaluación. **La política es una sola y es una lista de las llamadas que la tarea autoriza, con denegación por defecto: lo que no está en la lista se bloquea.** No hay escenario estricto y permisivo; esa pareja venía de cuando el eje era el destino y queda retirada. Las cinco llamadas permitidas salen de la tarea reconstruida. De ExploitGym no se toma nada para el código, incluidos encargos, herramientas y pruebas: solo se usa como contexto documental del control existente para la matriz control × fase. El encargo de las pruebas del ejecutor es una tarea de investigación escrita por nosotros. **La tesis del informe, corregida el 12 de septiembre:** no es que no hubiera controles ni registro. Había identidad, transcripciones y perímetro. Lo que no había era nadie leyendo las transcripciones, el registro estaba donde el agente podía reescribirlo, el canal de coordinación no tenía autenticación y la visibilidad terminaba en el escape del sandbox. Ninguno de los controles preguntaba si una llamada encajaba con el encargo autorizado. El portero es además el punto donde debe producirse el registro de quién hizo qué.
 
-**Pendiente de ejecución de la parte 2:** seleccionar carga legítima comparable o casos propios, concretar políticas de escenario y presupuestos, consultar las versiones de las guías y del repositorio que se citen al escribir esas reglas, implementar, medir y redactar resultados. La implementación del caso con información completa y el acceso a registros de OpenAI quedan fuera del compromiso del hackathon.
+**Pendiente de ejecución de la parte 2:** escribir los casos de trabajo legítimo, fijar el parámetro de la regla de capa 2, consultar las versiones de las guías que se citen, implementar, medir y redactar resultados. La implementación del caso con información completa y el acceso a registros de OpenAI quedan fuera del compromiso del hackathon.
 
-El relato de la entrega sigue este orden: **el control que existe hoy y sus huecos → el caso de referencia y la matriz control × fase → qué datos harían falta y qué no podemos ejecutar → método implementado con la wiki → resultados y límites**. Se distingue siempre entre lo que hicimos, lo que asumimos y lo que proponemos hacer después. No se presenta una extensión dibujada como si ya estuviera implementada o evaluada.
+Orden del informe: **el control que existe hoy y sus huecos → el caso de referencia y la matriz → qué datos harían falta y qué no podemos ejecutar → el método implementado con la wiki → resultados y límites**. Siempre separando lo que hicimos, lo que asumimos y lo que proponemos.
 
-Las referencias históricas y el paquete de fuentes se conservan en [el documento del sprint](ai-incident-response-sprint.md); los hallazgos sobre el harness, en [su propio documento](hallazgos-exploitgym.md) con su aviso de versión. Antes de incluir una afirmación sobre los incidentes en el informe, se comprueba su fuente primaria; los resúmenes previos no sustituyen esa comprobación.
+Las fuentes están en [el documento del sprint](ai-incident-response-sprint.md) y en [hallazgos-exploitgym.md](hallazgos-exploitgym.md). **Antes de escribir una afirmación sobre los incidentes se comprueba su fuente primaria**; un resumen anterior no vale como comprobación.
