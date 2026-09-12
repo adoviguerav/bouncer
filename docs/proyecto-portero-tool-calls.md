@@ -285,13 +285,13 @@ Las secciones 11 a 17 definen el trabajo que sí se implementa en el hackathon. 
 
 ### Del archivo al resultado
 
-1. Leer y preparar las revisiones sin modificar el corpus original; generar los conteos de limpieza.
-2. Convertir cada edición en un evento observado: ID tomado de `label`, hora, página, contenido disponible y referencia a `rev_id`. La operación `wiki.edit` se marca como adaptación.
-3. Asignar una política de experimento explícita. Como no conocemos todos los encargos originales, esa política define el escenario que estamos probando; no se presenta como el permiso histórico recuperado del agente.
-4. Recorrer los eventos cronológicamente con la capa 1 y las reglas con memoria de la capa 2. Guardar la decisión, su evidencia y los casos no evaluables. Ejecutar análisis colectivo solo si se implementa la extensión.
-5. Comparar resultados y producir tablas o figuras. Las pruebas con tareas propias aportan ejemplos con autorización conocida y verifican que una llamada bloqueada no ejecuta la herramienta.
+1. Preparar un único dataset JSONL limpio y tabular, sin modificar el corpus original: una fila por revisión utilizada, con ID tomado de `label`, hora, página, contenido disponible y referencia a `rev_id`. Conservar en esa misma fila los campos y la procedencia necesarios para inspeccionarla y usarla, sin uniones posteriores obligatorias. La operación `wiki.edit` se marca como adaptación; los datos desconocidos quedan explícitos. Generar aparte el resumen de limpieza, que no es un segundo dataset de revisiones.
+2. Preparar la escena local de investigación, su encargo, páginas, preguntas y estado inicial. Escribir la política y los guiones legítimos y prohibidos, incluidos los casos y el parámetro de una restricción con memoria. Como no conocemos todos los encargos originales, esa política define el escenario que estamos probando; no se presenta como el permiso histórico recuperado del agente.
+3. Implementar el portero, las herramientas y el ejecutor controlado, con identidad y política asignadas desde código de confianza y registro de decisiones y resultados. Verificar una operación permitida que se ejecuta y una edición bloqueada que no llega a la herramienta.
+4. Añadir memoria separada por ejecución y agente para la restricción definida, incluyendo límites e intentos simultáneos.
+5. Ejecutar la demo guionizada sin LLM y, por separado, recorrer el dataset histórico cronológicamente sin ejecutar su contenido. Comparar capa 1 frente a capas 1+2, guardar decisiones, evidencia y casos no evaluables, y producir tablas o figuras y comandos reproducibles. Ejecutar análisis colectivo solo si se implementa la extensión.
 
-**Productos de esta parte:** eventos normalizados con procedencia, resumen de limpieza, políticas versionadas, log de decisiones, pruebas y resultados reproducibles. No incluye descargar una traza privada de OpenAI ni construir una campaña completa de Hugging Face a partir de sus agregados.
+**Productos de esta parte:** dataset único normalizado con procedencia, resumen de limpieza, escenario y guiones propios, políticas versionadas, portero y ejecutor local con memoria e identidad, log de decisiones, pruebas, demo y resultados reproducibles. La preparación del dataset es solo la primera fase. No incluye descargar una traza privada de OpenAI ni construir una campaña completa de Hugging Face a partir de sus agregados.
 
 Los conteos de esta sección proceden de los archivos, no de asumir que los resúmenes anteriores son correctos. Prevalecen sobre las cifras y descripciones incompatibles del README de datos y de los documentos históricos.
 
@@ -332,6 +332,8 @@ Para seguir un historial de la wiki hacen falta un ID, una hora interpretable y 
 La necesidad del campo depende de la prueba: una comparación de contenido necesita texto; un recuento de acciones no. Un campo opcional ausente no invalida los demás datos. Una cadena vacía que representa una página vaciada puede ser un dato válido, no un NaN.
 
 Se conservan los originales y se genera un resumen de limpieza: filas de entrada, recuperadas, descartadas por motivo y usadas en cada evaluación. Las recuperaciones y uniones mantienen referencias a las filas de origen. No se fuerza una unión por semejanza de textos ni se multiplican acciones al unir varias URLs a una revisión.
+
+El dataset preparado es autocontenido para su uso previsto: las columnas necesarias para el análisis y su procedencia se conservan en el único archivo JSONL. Esto no exige copiar todos los archivos ni incorporar cada resumen disponible. Los resúmenes calculados con información posterior y `page_family` no se usan como entrada de decisión del portero.
 
 La unión por página con `pages` cubre todas las revisiones. Una unión con `records` por página y fecha puede devolver varios candidatos o compartir clave con varias revisiones; no demuestra por sí sola la autoría. No se arrastran las cifras previas de «69 %» o «9.233 filas completas» como condición para trabajar con texto: `revisions` ya lo contiene.
 
@@ -382,6 +384,8 @@ El registro común incluye:
 | Resultado de ejecución, cuando existe                    | Distinguir intento, permiso concedido y operación efectivamente terminada.                                                      |
 
 En cada evento se distingue lo observado de lo asignado al experimento: el nombre y la hora proceden de la wiki; el ID de reproducción, la política de escenario y la representación `wiki.edit` los añade nuestro programa. El encargo original desconocido no se rellena con una etiqueta de página ni con una explicación escrita por un modelo.
+
+El dataset preparado conserva la evidencia histórica y su adaptación declarada. El `run_id`, la política activa, la decisión y el resultado de cada reproducción se registran al ejecutarla; no se presentan como datos históricos ni como ejecución de una edición del corpus. Este log de resultados es distinto del único dataset de entrada.
 
 **Esto no es propuesta nuestra:** el harness del caso ya genera por tarea un `agent_id` y un token desde el controlador, o sea identidad puesta por código de confianza — y aun así no había ninguna comprobación en la llamada. Asignar un ID sirve para atribuir, no sustituye restringir credenciales y permisos. Si una integración mezcla agentes sin decir quién hizo cada llamada, se arregla la integración: el portero no lo adivina del contenido.
 
@@ -482,7 +486,7 @@ El log JSONL incluye evento, IDs, versión de política, reglas aplicadas, decis
 
 ## 15. Implementación de la parte 2 y frontera del control
 
-Programa local, política YAML, entradas y resultados JSONL. El recorrido principal es la reproducción de la wiki. Un único ejecutor controlado complementa ese análisis para demostrar el bloqueo; no necesita un agente real intentando escapar. El adaptador envuelve la ejecución de herramientas; una integración con LangGraph puede reutilizarlo sin exigir un servicio web, base de datos ni plataforma de observabilidad.
+Programa local, política YAML, dataset de entrada y resultados JSONL. Hay dos recorridos: la reproducción histórica de la wiki, sin ejecutar su contenido, y una demo guionizada con herramientas locales que demuestra trabajo legítimo y veto real. No necesita un agente real intentando escapar ni llamadas a un LLM. El adaptador envuelve la ejecución de herramientas; una integración con LangGraph puede reutilizarlo sin exigir un servicio web, base de datos ni plataforma de observabilidad.
 
 El portero, sus IDs y su política deben quedar fuera del alcance de escritura del agente. La demostración declara qué herramientas pasan por el control y prueba que las llamadas bloqueadas no llegan al ejecutor. No se afirma proteger vías que no atraviesan ese punto ni procesos autónomos ya lanzados.
 
@@ -498,7 +502,7 @@ Los casos se agrupan por qué capa debería pararlos, y se construyen en este or
 
 **Primero, los que debe parar la capa 1.** La llamada no está en la lista de permitidas, y se ve mirando una sola llamada. Cada revisión utilizable de la wiki se representa como la operación adaptada `wiki.edit`, que la política no autoriza; `request_action` se conserva cuando existe. Se espera bloquear las 13.661 ediciones, incluida la primera de cada ID; ese resultado está pendiente de ejecutar la reproducción.
 
-**Segundo, los que la capa 1 no puede parar.** Cada llamada por separado está permitida, y el problema solo aparece al sumarlas: un destino, luego otro, luego otro. Son los que le dan trabajo a la capa 2. **Si no metemos casos así, el experimento no responde a su propia pregunta**, porque nunca sabremos si la memoria aporta algo. Los escribimos nosotros.
+**Segundo, los que la capa 1 no puede parar.** Cada llamada por separado está permitida, pero la secuencia incumple la restricción que se concrete para la tarea propia en fase 2. El caso previsto gira alrededor de las esperas entre rondas; su condición y sus parámetros siguen pendientes, y repetir una llamada no basta por sí solo para justificar un bloqueo. Los casos los escribimos nosotros para comprobar el aporte de la memoria.
 
 **Tercero, los que no debe parar nadie.** Trabajo normal de un agente haciendo lo que le mandaron. Miden si el portero estorba, que es la mitad de la pregunta que guía el proyecto. Los escribimos nosotros como parte de la escena de investigación acordada.
 
@@ -514,7 +518,7 @@ El segundo y el tercer grupo se declaran como material propio. No dan una tasa g
 
 Las pruebas se escriben antes de implementar cada comportamiento. Verifican restricciones concretas, no que el código repita su propia fórmula.
 
-### Comparación de versiones
+### Comparación de capa 1 frente a capas 1+2
 
 Comparar **capa 1 sola** con **capas 1+2** sobre los mismos escenarios y políticas compatibles. Para cada regla registrar qué caso cubre, su origen, qué necesita observar y su coste.
 
@@ -534,23 +538,23 @@ La capa 4, si se implementa, añade precisión, cobertura y momento del aviso po
 
 ## 17. Trabajo y entregables para 12 horas
 
-| Bloque | Trabajo                                                                                                                                                                                      | Presupuesto orientativo |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| 1      | Verificar el corpus y sus conteos; escribir la lista de llamadas autorizadas a partir de la tarea reconstruida; cerrar la matriz control × fase; seleccionar casos legítimos y prohibidos. | 2 h                     |
-| 2      | Adaptador, IDs, capa 1, memoria y reglas de capa 2, registro y pruebas incrementales.                                                                                                        | 4 h                     |
-| 3      | Ejecutar comparaciones, revisar errores, producir tabla o figura reproducible y medir coste.                                                                                                 | 2 h                     |
-| 4      | Informe escrito por el equipo, limitaciones, referencias y empaquetado del artefacto.                                                                                                        | 4 h                     |
+La secuencia técnica y los criterios de cierre viven en la sección 11 del [PRD](../PRD.md): **1. dataset único y limpio → 2. escenario y política → 3. portero y ejecutor → 4. memoria → 5. demo, reproducción y resultados**. La sección 11 de este diseño describe el mismo recorrido; las pruebas acompañan cada fase. No se reduce el proyecto a preparar datos.
 
-La matriz va en el bloque 1 y no en el informe por dos motivos: sus parámetros se fijan antes de evaluar nada, como el resto de la política, y si el bloque 4 se desborda no puede arrastrar consigo el artefacto que el track pide de forma más explícita.
+| Trabajo | Presupuesto orientativo |
+| ------- | ----------------------- |
+| Las cinco fases técnicas: datos, escenario, portero, memoria y resultados reproducibles. | 8 h en total |
+| Entrega documental: matriz de Hugging Face, diseño de la parte 1, informe escrito por el equipo, limitaciones, referencias y empaquetado. | 4 h en total |
 
-Las capas opcionales no tienen horas reservadas: solo entran si el núcleo y su evaluación terminan antes. Prioridad entre extensiones de la parte 2: **escena de escritura sobre recurso compartido permitido, después capa 4, después capa 3 con casos de tarea conocida, después vídeo o demo con un agente real**. La primera va delante porque reproduce el mecanismo documentado del incidente y cuesta alrededor de una hora sobre el núcleo. No se sacrifica la evaluación de trabajo legítimo ni el informe para añadirlas. La parte 1 se entrega como diseño posterior, no como otra implementación dentro de este presupuesto.
+La matriz control × fase pertenece al análisis documental de Hugging Face y sigue siendo obligatoria. No es una fase de código ni una dependencia para preparar el dataset o implementar el portero; puede prepararse en paralelo. Los resultados medidos se incorporan al informe cuando termine la fase técnica correspondiente.
+
+Las capas opcionales no tienen horas reservadas: solo entran si el núcleo y su evaluación terminan antes. Prioridad entre extensiones de la parte 2: **escena de escritura sobre recurso compartido permitido, después capa 4, después capa 3 con casos de tarea conocida, después vídeo o demo con un agente real**. La primera va delante porque reproduce el mecanismo documentado del incidente y cuesta alrededor de una hora sobre el núcleo. No se sacrifica la evaluación de trabajo legítimo ni el informe para añadirlas. El análisis y la matriz de la parte 1 se entregan ahora; su integración con el operador queda como propuesta posterior, fuera de esta implementación.
 
 Entregables del proyecto:
 
 1. Política y tabla «regla → origen → restricción → evidencia de prueba → coste».
 2. Portero con IDs, memoria y adaptador a un ejecutor controlado.
-3. Preparación/reproducción de datos con conteos de limpieza y supuestos.
-4. Pruebas y comparación reproducible de capa 1 frente a 1+2; ampliaciones solo si se hicieron.
+3. Dataset único preparado, reproducción histórica sin ejecutar el corpus, conteos de limpieza y supuestos.
+4. Escenario propio, demo guionizada sin LLM, pruebas y comparación reproducible de capa 1 frente a 1+2; ampliaciones solo si se hicieron.
 5. Informe sobre la plantilla oficial, hasta 8 páginas sin referencias/apéndices, abstract de hasta 150 palabras, autores y apéndice obligatorio de limitaciones y doble uso, según el documento del sprint.
 6. Matriz control × fase de ataque sobre las nueve fases documentadas, con sus supuestos y sus límites declarados.
 7. Diseño de la parte 1: esquema general, datos requeridos, qué no podemos ejecutar y procedimiento para evaluar el caso con información completa, claramente separado de los resultados de la wiki.

@@ -2,6 +2,7 @@
 
 **Estado:** alcance acordado; implementación y resultados pendientes.
 **Fecha:** 11 de septiembre de 2026.
+**Actualización de implementación:** 12 de septiembre de 2026; dataset único y recorrido completo por fases.
 **Proyecto:** AI Incident Response Sprint, Track 1.
 **Tiempo disponible:** unas 12 horas de trabajo real.
 **Fuente de alcance:** [documento del proyecto](docs/proyecto-portero-tool-calls.md). Los [hallazgos sobre ExploitGym](docs/hallazgos-exploitgym.md) aportan contexto documental sobre el control existente, no material para el código.
@@ -9,6 +10,8 @@
 Qué hay que entregar y cómo comprobarlo. Las explicaciones están en el documento del proyecto. Nada implementado ni evaluado todavía.
 
 Primero el caso de referencia (OpenAI/Hugging Face), que es lo que pide el Track 1; después la implementación con la wiki. Se implementa la wiki, se documenta el caso.
+
+**El proyecto completo sigue incluyendo datos, escenario de investigación, portero con ejecutor y registro, memoria por agente, demo y reproducción del histórico.** Preparar un dataset único es la primera fase, no una reducción de ese alcance. La sección 11 describe las cinco fases técnicas; el caso Hugging Face, su matriz y el informe son entregables documentales separados de esa numeración.
 
 ## 1. Problema y objetivo
 
@@ -136,6 +139,10 @@ Dos límites que no desaparecen por implementarlo: el control solo veta lo que p
 
 Fuente principal: [corpus local de la wiki](data/collusion-wiki/), especialmente `revisions.jsonl.gz` y `labels.jsonl.gz`.
 
+**Salida de preparación: un único dataset limpio en `data/prepared/wiki/events.jsonl`.** Una fila representa una revisión utilizada, con las columnas necesarias para inspeccionarla como tabla y para el análisis posterior: ID de evento/revisión, autor e identidad literal, fecha y calidad temporal, página, cuerpo, acción de petición cuando exista, operación adaptada y referencias de origen. Los campos desconocidos se identifican; no se completan con conjeturas. El archivo contiene esos datos, incluido el texto disponible, sin exigir otra unión con los originales para consultarlo o recorrerlo.
+
+Este archivo es la fuente preparada común para inspección y reproducción. «Único» se refiere al dataset de ediciones: el resumen de limpieza, la política, los guiones propios y los logs son artefactos distintos, con otra función. Los guiones no se mezclan con las revisiones históricas. Se comprueba que el JSONL puede cargarse como una tabla con pandas; no hace falta construir una interfaz ni mantener otra copia del dataset.
+
 | Hecho verificado en el diseño                                                                        | Uso en el PRD                                                                                                                               |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | 14.591 revisiones originales.                                                                        | Denominador de entrada; conservar los archivos originales.                                                                                  |
@@ -170,6 +177,15 @@ Sobre el corpus, cada revisión utilizable se representa como la operación adap
 
 ## 6. Flujos del usuario
 
+### A0. Preparar e inspeccionar el dataset
+
+1. Leer los originales y seleccionar los campos necesarios, sin modificar sus archivos.
+2. Limpiar identidades y fechas según las reglas acordadas, conservar cuerpos vacíos válidos y documentar recuperaciones/exclusiones.
+3. Generar `events.jsonl` con una fila por revisión utilizada y `cleaning.json` con la conciliación y los motivos.
+4. Cargar únicamente `events.jsonl` como tabla, revisar filas y conteos, y usar ese mismo archivo para la reproducción posterior.
+
+Completar este flujo no ejecuta llamadas ni termina el proyecto. Las fases siguientes construyen y prueban el portero.
+
 ### A. Reproducir la wiki
 
 1. Seleccionar el corpus y una política de escenario con versión y procedencia.
@@ -197,7 +213,7 @@ Todos son mínimo obligatorio. La columna de la derecha es lo que hay que observ
 
 | ID        | Requisito                                                                                                                                       | Observación que permite aceptarlo                                                                                                                                                                                                                                                                                                                                                                 |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **P0-01** | Preparar datos con identidad y procedencia.                                                                                                     | Los conteos concilian entrada, exclusiones, recuperaciones y filas utilizadas; los nombres no se fusionan ni los anónimos se convierten en un agente. Cada evento remite a su revisión original.                                                                                                                                                                                                  |
+| **P0-01** | Preparar un dataset único, tabular, con identidad y procedencia. | `events.jsonl` se carga por sí solo como tabla y contiene una fila por revisión utilizada, incluido su cuerpo disponible y referencia original. Los conteos concilian entrada, exclusiones y recuperaciones; los nombres no se fusionan ni los anónimos se convierten en un agente. |
 | **P0-02** | Separar datos observados, adaptados y desconocidos.                                                                                             | El registro identifica la operación adaptada, la política de escenario y el origen del ID. Un campo desconocido no se rellena con una etiqueta de evaluación. Se preservan cuerpos vacíos válidos.                                                                                                                                                                                                |
 | **P0-03** | Aplicar permisos explícitos, con reglas YAML versionadas, como una lista de las llamadas que la tarea autoriza y denegación por defecto. | Una llamada de la lista pasa; una que no está en la lista se bloquea por denegación por defecto, con el ID de regla correcto. Cada llamada permitida cita de qué parte de la tarea sale. Una regla no evaluable en el histórico se registra como tal.                                                                                                                                     |
 | **P0-04** | Aplicar reglas con memoria separada por ejecución e ID.                                                                                         | Un presupuesto de una tarea de prueba permite las acciones dentro de su límite y bloquea la siguiente; otro ID conserva su propio presupuesto. La comprobación/reserva no permite que llamadas simultáneas excedan la cuota.                                                                                                                                                                      |
@@ -206,7 +222,7 @@ Todos son mínimo obligatorio. La columna de la derecha es lo que hay que observ
 | **P0-07** | Reproducir y comparar de forma determinista.                                                                                                    | Mismos eventos y política producen las mismas decisiones y evidencias funcionales, excluidas mediciones de tiempo de cómputo. Los empates temporales tienen desempate reproducible sin afirmar orden real subsegundo.                                                                                                                                                                             |
 | **P0-08** | Evaluar permisos solos frente a permisos con memoria.                                                        | Se entrega una tabla o figura con cantidades, denominadores y coste por llamada; distingue el histórico de la wiki de las pruebas locales con autorización conocida, y declara que sobre el histórico la capa 2 no puede aportar bloqueo porque la primera llamada de cada agente ya cae.                                                                                                                              |
 | **P0-10** | Entregar la matriz control × fase de ataque.                                                                                                    | La matriz cubre las nueve fases documentadas y para cada una dice qué ve una allowlist de egress y qué ve una comprobación en la llamada. Expresa posiciones como fracciones de la campaña documentada y nunca como números de acción. Declara el supuesto de encargo del que depende su clasificación. No atribuye a la comprobación en la llamada un disparo más temprano que el del perímetro. |
-| **P0-09** | Entregar instrucciones y documentación de ambas partes.                                                                                         | Otra persona puede reproducir preparación, pruebas y comparación con instrucciones verificadas. El informe presenta método, resultados, supuestos y limitaciones; la parte 1 queda descrita como trabajo posterior.                                                                                                                                                                               |
+| **P0-09** | Entregar instrucciones y documentación de ambas partes. | Otra persona puede reproducir preparación, pruebas y comparación con instrucciones verificadas. El informe y la matriz de la parte 1 se entregan ahora; solo su integración con el operador queda como trabajo posterior. Se distinguen método, resultados, supuestos y limitaciones. |
 
 ### Detalles que forman parte de estos requisitos
 
@@ -222,11 +238,12 @@ Todos son mínimo obligatorio. La columna de la derecha es lo que hay que observ
 
 | Artefacto           | Contenido mínimo                                                                                                                                                                          |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Eventos preparados  | ID y referencia de origen, ID del agente y procedencia, ID de reproducción/ejecución, hora y calidad temporal, operación/destino/argumentos disponibles, campos adaptados y desconocidos. |
+| Dataset preparado único | `data/prepared/wiki/events.jsonl`: una revisión utilizada por fila, con ID/referencia, autor e identidad/procedencia, hora/calidad temporal, página, cuerpo disponible, operación adaptada y campos desconocidos. No contiene decisiones inventadas ni casos propios. El ID de reproducción/ejecución lo asigna el experimento y no se presenta como histórico. |
+| Escenario y guiones propios | Encargo de investigación, recursos locales iniciales, política asignada y llamadas con expectativas de decisión y efecto. Las expectativas se mantienen fuera de los argumentos enviados al portero. |
 | Política            | Versión, escenario/encargo, reglas identificadas, permisos, límites con memoria, origen y respuesta ante incumplimiento.                                                                  |
 | Resumen de limpieza | Entrada, exclusiones por motivo, recuperaciones con referencia y cantidades utilizadas por análisis.                                                                                      |
 | Log de decisiones   | Evento, IDs, política, reglas, decisión, motivo, evidencia, duración y estado/resultado de ejecución cuando proceda.                                                                      |
-| Resultados          | Comparaciones de versiones, cantidades y denominadores, errores en tareas conocidas, avisos/retenciones y coste; limitaciones y casos no evaluables.                                      |
+| Resultados          | Comparación de capa 1 frente a capas 1+2 con una misma política, cantidades y denominadores, errores en tareas conocidas, avisos/retenciones y coste; limitaciones y casos no evaluables. |
 
 Ficheros locales: política en YAML, registros en JSONL. Nada de servicios.
 
@@ -252,7 +269,7 @@ Ficheros locales: política en YAML, registros en JSONL. Nada de servicios.
 
 Las tasas de error se calculan solo donde hay una decisión de referencia independiente y un denominador declarado. Se informa de tamaño y origen de la muestra. Las tareas controladas no justifican una tasa general sobre agentes reales, y una función de página no es una etiqueta de autorización de llamada.
 
-### Contrato de cierre de la parte 2
+### Contrato de cierre de la entrega completa
 
 - [ ] P0-01 a P0-10 cuentan con evidencia reproducible.
 - [ ] La matriz control × fase declara sus tres límites y no afirma precocidad de la comprobación en la llamada.
@@ -286,16 +303,77 @@ Entrada: tarea/permisos de confianza, llamada y evidencia individual/colectiva r
 
 Medir qué errores corrige e introduce, retenciones, duración y recursos frente al núcleo sin modelo. La falta de encargo original en la wiki impide convertir una valoración del texto en una evaluación completa de autorización.
 
-## 11. Plan de entrega
+## 11. Fases de implementación y entrega
 
-| Fase | Trabajo                                                                                                       | Tiempo orientativo | Salida                                   |
-| ---- | ------------------------------------------------------------------------------------------------------------- | ------------------ | ---------------------------------------- |
-| 1    | Datos, escenario de investigación y pruebas propios, matriz control × fase y reglas con origen.             | 2 h                | P0-01/02/10 y política/casos preparados. |
-| 2    | Ejecutar pruebas primero e implementar permisos, memoria, identidad, adaptador y registro.                    | 4 h                | P0-03 a P0-06 y pruebas del núcleo.      |
-| 3    | Reproducción y comparación; revisar errores y producir tabla/figura y costes.                                 | 2 h                | P0-07/08 y evidencias.                   |
-| 4    | Informe del equipo, instrucciones verificadas, limitaciones y empaquetado.                                    | 4 h                | P0-09 y parte 1 documentada.             |
+Estas cinco fases reorganizan el mismo mínimo técnico para poder construirlo y comprobarlo paso a paso. Sustituyen la tabla anterior, que mezclaba código e informe. El presupuesto total sigue siendo unas **8 horas para el trabajo técnico y 4 para la entrega documental**; dividir el trabajo no añade horas ni requisitos.
 
-La entrega incluye informe en plantilla oficial, abstract de hasta 150 palabras, autores, máximo 8 páginas sin referencias/apéndices y apéndice obligatorio de limitaciones y doble uso, según el diseño aprobado. El informe es escritura del equipo sobre su trabajo; este PRD no es ese informe. Publicación o despliegue no se realizan al crear el PRD.
+### Fase 1 — Dataset único, limpio y consultable
+
+Preparar un archivo con las revisiones utilizables y toda la información necesaria para inspeccionarlas y recorrerlas después. Aquí se trabaja con datos históricos; todavía no se decide ni ejecuta ninguna llamada.
+
+1. Definir las columnas y escribir pruebas pequeñas de identidad, campos ausentes, cuerpo vacío y orden temporal.
+2. Implementar la lectura de los comprimidos y la limpieza: humanos fuera, nombres literales, recuperación solo por referencia explícita y exclusiones con motivo.
+3. Representar cada revisión utilizada en una fila, conservar el cuerpo y su procedencia, y marcar `wiki.edit` como adaptación.
+4. Generar `data/prepared/wiki/events.jsonl` y `cleaning.json`; conciliar entrada, exclusiones, recuperaciones e IDs.
+5. Comprobar que el dataset se abre por sí solo como tabla, se regenera de forma idéntica y deja los originales intactos.
+
+**Salida comprobable:** dataset único consultable, resumen de limpieza y comando de preparación probado. Cubre P0-01/02; no sustituye las demás fases.
+
+### Fase 2 — Escenario, política y llamadas de prueba
+
+Preparar una investigación local escrita por nosotros, con llamadas guionizadas y resultados esperados. Esta escena aporta las lecturas, respuestas y esperas que no aparecen en el dataset de ediciones; no requiere conectar un LLM.
+
+1. Escribir el encargo y preparar páginas locales, preguntas, respuestas de referencia y estado inicial de la wiki.
+2. Definir argumentos y resultados de las cinco operaciones legítimas: buscar, leer una página, consultar pregunta, entregar respuesta y esperar.
+3. Escribir una política YAML versionada con esos permisos, su origen y denegación por defecto.
+4. Concretar con el usuario la restricción de memoria: condición, parámetro/unidad, tiempo de confianza y consumo/liberación. Repetir `clock.wait` no es por sí solo un incumplimiento; no inventar un límite para obtener bloqueos.
+5. Preparar guiones de trabajo legítimo, edición prohibida, operación desconocida, límite con memoria y otro ID independiente. Anotar decisión y efecto esperado por llamada, fuera de los argumentos del portero, y separar casos de preparación y comprobación.
+
+**Salida comprobable:** encargo, recursos, política y casos coherentes, sin parámetros de autorización pendientes antes de implementar sus reglas. Prepara las pruebas de P0-03 a P0-06.
+
+### Fase 3 — Portero, ejecución local y registro
+
+Construir el recorrido **llamada propuesta → permisos → decisión y registro → ejecución solo si corresponde → resultado o error**. Las llamadas son guionizadas, pero el ejecutor invoca funciones locales reales y el veto debe impedir su efecto.
+
+1. Escribir primero las pruebas de permitir, bloquear, retener, argumentos inválidos y datos imprescindibles ausentes.
+2. Implementar carga/validación de política y comprobación de herramienta, operación, destino y argumentos; denegar lo que no está autorizado.
+3. Implementar herramientas locales para la investigación y una edición de prueba, junto con el ejecutor que siempre consulta al portero antes de invocarlas.
+4. Asignar IDs y política desde código de confianza; los argumentos de una llamada no pueden sustituirlos. Ejecutar exactamente la operación y argumentos comprobados.
+5. Registrar quién propuso qué, decisión, regla, motivo y referencia; enlazar resultado o error de herramienta sin copiar cuerpos completos ni secretos al log por defecto.
+6. Comprobar que una lectura devuelve contenido, una respuesta se entrega y una edición bloqueada no invoca la herramienta ni modifica la wiki local.
+
+**Salida comprobable:** veto real y trabajo legítimo funcionando con registro revisable. Cubre P0-03/05/06. La adaptación explícita `wiki.edit` no se presenta como la llamada histórica original ni como prueba de inspección de cualquier GET arbitrario.
+
+### Fase 4 — Memoria por ejecución y agente
+
+Añadir la restricción definida en fase 2 después de los permisos y antes de ejecutar. El mismo portero podrá comparar una llamada con el historial de su propio ID sin mezclarlo con el de otros.
+
+1. Escribir pruebas de secuencia dentro del límite, límite excedido y aislamiento entre agentes y ejecuciones.
+2. Implementar únicamente el contador o antecedente que exige la regla, con su consumo/liberación declarado.
+3. Comprobar y reservar permiso antes de ejecutar, incluyendo el caso de llamadas simultáneas que intentan gastar la misma cuota.
+4. Añadir al log la regla y el estado relevante que justifican la decisión; probar el comportamiento ante errores de ejecución según la política.
+
+**Salida comprobable:** secuencia legítima ejecutada, exceso bloqueado y otro ID sin consumir el presupuesto ajeno. Cubre P0-04; la memoria continúa siendo parte obligatoria del núcleo.
+
+### Fase 5 — Demo, reproducción histórica y resultados
+
+Un comando muestra los guiones atravesando el portero y sus efectos locales; otro analiza las filas del dataset sin ejecutar su contenido. Ambos usan el mismo núcleo de decisión, distinguiendo llamadas pendientes de ejecutar y ediciones que ya ocurrieron.
+
+1. Montar la demo sin LLM y mostrar llamada, decisión, regla y efecto o ausencia de efecto; poder restaurar el estado inicial entre ejecuciones.
+2. Implementar el recorrido cronológico del dataset y un log por evento, con estado no evaluable cuando falte evidencia para una comprobación.
+3. Ejecutar permisos solos y permisos con memoria con la misma política y estados independientes; comprobar determinismo salvo mediciones de duración.
+4. Generar una tabla de cantidades y denominadores: decisiones, errores en casos propios, tareas legítimas terminadas y tiempo de comprobación. Separar histórico y demo; no atribuir mejora histórica a memoria si la capa 1 ya deniega todas las ediciones.
+5. Pasar las pruebas acumuladas, revisar el código, verificar cobertura del núcleo de al menos 80 % y seguir las instrucciones de preparación/demo/reproducción desde el entorno documentado.
+
+**Salida comprobable:** demo repetible, resultados del corpus, comparación e instrucciones verificadas. Cubre P0-07/08 y la reproducción técnica de P0-09. Las pruebas de cada comportamiento se escriben durante su fase, no se aplazan hasta aquí.
+
+### Entrega documental — Obligatoria, fuera de la numeración técnica
+
+La parte OpenAI/Hugging Face permanece en el proyecto. Cerrar su matriz de nueve fases, supuestos, fuentes y costes (P0-10); explicar qué datos se pedirían al operador y qué integración queda para después. Esta tabla no alimenta el programa ni condiciona construir el dataset o probar el portero.
+
+Preparar además el informe del equipo con método, resultados realmente obtenidos, limitaciones y referencias, y empaquetar las instrucciones y artefactos (P0-09). Reservar las cuatro horas acordadas para este trabajo; la matriz se puede trabajar en paralelo y no se deja como opcional.
+
+La entrega incluye informe en plantilla oficial, abstract de hasta 150 palabras, autores, máximo 8 páginas sin referencias/apéndices y apéndice obligatorio de limitaciones y doble uso, según el diseño aprobado. El informe es escritura del equipo sobre su trabajo; este PRD no es ese informe. Publicación o despliegue no se realizan al actualizar el PRD.
 
 ## 12. Riesgos y parámetros pendientes
 

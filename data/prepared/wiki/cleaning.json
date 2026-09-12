@@ -1,0 +1,59 @@
+{
+  "input": {
+    "file": "revisions.jsonl.gz",
+    "rows": 14591,
+    "sha256": "9c2a4ef0ccbfb5b42be8422342a6bd3a389a4a047bc891e3148354dd65b63c96"
+  },
+  "labels": {
+    "file": "labels.jsonl.gz",
+    "rows": 3103,
+    "sha256": "c1cd171f4794ea3e59803c92aba9dc552587db984dc43c7939338d5845c59860",
+    "revision_labels_not_in_file": 0
+  },
+  "human_handles": [
+    "[Admin1]",
+    "[Admin2]",
+    "[Person22]"
+  ],
+  "exclusion_order": [
+    "human_handle",
+    "missing_identity",
+    "invalid_time",
+    "missing_page"
+  ],
+  "excluded": {
+    "human_handle": 31,
+    "missing_identity": 899,
+    "invalid_time": 0,
+    "missing_page": 0
+  },
+  "recovered": {
+    "count": 0,
+    "reference_field": "related_event_id",
+    "missing_identity_with_reference": 0
+  },
+  "used": {
+    "rows": 13661,
+    "agent_ids": 3099,
+    "empty_bodies": 74,
+    "missing_request_action": 74
+  },
+  "output": {
+    "file": "events.jsonl",
+    "operation": "wiki.edit",
+    "columns": [
+      "rev_id",
+      "source_ref",
+      "agent_id",
+      "time",
+      "time_grade",
+      "uncertainty_seconds",
+      "page_key",
+      "seq",
+      "body",
+      "request_action",
+      "operation",
+      "provenance"
+    ]
+  }
+}
