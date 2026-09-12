@@ -228,6 +228,8 @@ The reviewer and the collective analysis have to justify that they are useful. M
 
 ## 8. Proposed application to the OpenAI/Hugging Face case
 
+**Part 2 is this same shape, already run end to end on a case where we do have the data.** What follows is not a different method: it is the same two checks — the call against the task's list, then the authorized call against that agent's history — pointed at an incident whose trajectories we do not hold. What is missing there is the log, not the procedure.
+
 The gatekeeper is placed where the operator executes its agents' tools. The original trajectories and tasks of the runs involved would be needed; Hugging Face's public aggregates give context and do not replace that log.
 
 Example of the path, and it is a proposal, not something we have done: for a permitted network egress, look first at which operation and arguments were authorized; then at the calls of that ID, and the collective pattern if other IDs used the same resource; and only then pass the doubtful case to the model, with the task in front of it.
@@ -280,6 +282,15 @@ And from there also comes our data situation, which is declared as is: for the b
 ## Part 2 — The implementation: the wiki
 
 Sections 11 to 17 define the work that is implemented in the hackathon. It is the observable evidence of the pattern in section 2: agents acting on a shared resource without any control checking or logging it. The model and coordination extensions that appear in these sections remain optional.
+
+**What part 2 is, in one sentence: the worked example of the method.** It takes one concrete experiment — a research task, the calls that task authorizes, agents making calls — and shows what a gatekeeper on the call lets through and what it stops. Two checks, in order, and the second only ever sees what the first authorized:
+
+- **Is the call on the list the task authorizes?** If not, it is stopped, and no rule had to name it in advance. On the corpus this is the whole of it: every observed edit is a `wiki.edit`, which the task does not authorize.
+- **The call is on the list — is this agent using it in a normal way?** A permitted call made in an abnormal pattern is another shape of abuse, and one call on its own cannot show it. Waiting is authorized; chaining waits that cost no real time is the documented trick of the incident.
+
+The wiki is the case that makes it concrete, not the point. **The point is the shape: name what the task authorizes, check each call against it, then check the authorized ones against that agent's own history.** Section 8 applies exactly this to the OpenAI/Hugging Face case, and remains a proposal there for one reason only — we have the wiki's edits and we do not have that incident's trajectories.
+
+And the asymmetry has to be stated wherever the results are: the corpus gives real data for the first check and cannot give any for the second, because the wiki recorded only the calls that reached it — that is, only the ones the first check stops. The permitted calls happened and were logged nowhere. The second check is therefore shown on our own scripted agents, labelled as ours.
 
 ## 11. Available data and experiment path
 

@@ -25,7 +25,12 @@ The wiki case shows it in miniature and without assuming anything: writing was f
 
 **Part 1** walks through the OpenAI/Hugging Face case, which is what Track 1 asks for: what control existed, what each one would have seen across the nine documented phases (control × phase matrix), what data we would ask the operator for, and what we cannot run, for budget or for prudence.
 
-**Part 2** prepares a single dataset with the edit log of a wiki, implements the gatekeeper, and demonstrates it with local tools. We use the non-human names as IDs, declare the missing data, and replay the edits without executing instructions, code, or URLs from the corpus.
+**Part 2** is the worked example of the method: one concrete experiment — a research task, the calls that task authorizes, agents making calls — showing what a gatekeeper on the call lets through and what it stops. Two checks, in order, and the second only ever sees what the first authorized:
+
+1. **Is the call on the list the task authorizes?** If not, it is stopped, and no rule had to name it in advance.
+2. **The call is on the list — is this agent using it in a normal way?** A permitted call made in an abnormal pattern is another shape of abuse, and one call on its own cannot show it.
+
+The wiki makes it concrete; it is not the point. The point is the shape, and it is the same shape part 1 proposes for the OpenAI/Hugging Face case — what is missing there is the log, not the procedure. Part 2 prepares a single dataset with the edit log of a wiki, implements the gatekeeper, and demonstrates it with local tools. We use the non-human names as IDs, declare the missing data, and replay the edits without executing instructions, code, or URLs from the corpus.
 
 The sprint demonstration simulates the research task with a gatekeeper between the tool call and its execution. We wrote the task and the scripted calls ourselves, with no LLM and no API spend. The gatekeeper and the local tools do run: reads return content and a blocked edit leaves the local wiki intact. The goal is to show a verifiable use case with concrete tests; the script is not observed model behavior, and the corpus only preserves the edits, not the full research.
 
