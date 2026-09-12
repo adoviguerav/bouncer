@@ -17,7 +17,7 @@ def state(tmp_scenario: Path, wall_clock) -> RunState:
         workdir=tmp_scenario / "wiki",
         task_clock_seconds=0,
         wall_clock=wall_clock,
-        clock_mode="harness_bug",
+        clock_mode="clock_runs_ahead",
         cooldown_seconds=COOLDOWN,
         round=0,
         answers={},
@@ -25,7 +25,7 @@ def state(tmp_scenario: Path, wall_clock) -> RunState:
     )
 
 
-def test_clock_wait_harness_bug_advances_instantly(state: RunState, wall_clock) -> None:
+def test_clock_wait_clock_runs_ahead_advances_instantly(state: RunState, wall_clock) -> None:
     before = wall_clock()
     TOOLS["clock.wait"](state, {"seconds": 600})
     assert state.task_clock_seconds == 600

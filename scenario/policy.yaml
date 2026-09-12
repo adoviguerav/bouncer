@@ -44,8 +44,8 @@ allowed:
     name_source: corpus # clock.wait appears literally in the agents' messages
 
 # Declared here so the policy has a single version; enforced in phase 4.
-memory_rules:
-  - id: clock-budget
+history_rules:
+  - id: wait-costs-real-time
     scope: agent_history
     tool: clock
     operation: wait

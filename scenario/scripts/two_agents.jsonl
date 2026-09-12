@@ -1,4 +1,4 @@
 {"agent": "ResearchAgentE", "set": "evaluation", "phase": 4, "call": {"tool": "clock", "operation": "wait", "args": {"seconds": 900}}, "expect": {"decision": "allow", "effect": "E: first wait"}}
 {"agent": "ResearchAgentF", "set": "evaluation", "phase": 4, "call": {"tool": "clock", "operation": "wait", "args": {"seconds": 900}}, "expect": {"decision": "allow", "effect": "F: first wait; E's reservation must not count against F"}}
-{"agent": "ResearchAgentE", "set": "evaluation", "phase": 4, "call": {"tool": "clock", "operation": "wait", "args": {"seconds": 900}}, "expect": {"decision": "block", "effect": "E: chained wait exceeds wall seconds elapsed (memory layer)"}}
+{"agent": "ResearchAgentE", "set": "evaluation", "phase": 4, "call": {"tool": "clock", "operation": "wait", "args": {"seconds": 900}}, "expect": {"decision": "block", "effect": "E: chained wait exceeds wall seconds elapsed (per_history layer)"}}
 {"agent": "ResearchAgentF", "set": "evaluation", "phase": 4, "call": {"tool": "page", "operation": "read", "args": {"page": "oecd-equity"}}, "expect": {"decision": "allow", "effect": "F keeps working; E's block does not affect F"}}

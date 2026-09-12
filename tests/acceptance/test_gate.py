@@ -36,7 +36,7 @@ def test_policy_loads_and_cites_task(scenario: Path, policy) -> None:
         assert entry["scope"] == "call", entry
         assert source_slug(entry["source"]) in slugs, entry
 
-    clock_rules = [r for r in policy.memory_rules if (r["tool"], r["operation"]) == ("clock", "wait")]
+    clock_rules = [r for r in policy.history_rules if (r["tool"], r["operation"]) == ("clock", "wait")]
     assert len(clock_rules) == 1
     rule = clock_rules[0]
     assert rule["scope"] == "agent_history"

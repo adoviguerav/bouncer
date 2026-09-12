@@ -18,7 +18,7 @@ class RunState:
     workdir: Path
     task_clock_seconds: int
     wall_clock: Callable[[], float]
-    clock_mode: str  # "honest" | "harness_bug"
+    clock_mode: str  # "clocks_matched" | "clock_runs_ahead"
     cooldown_seconds: int
     round: int
     answers: dict[int, str]
@@ -66,11 +66,11 @@ def clock_wait(state: RunState, args: dict) -> int:
     next_arrival = (state.task_clock_seconds // state.cooldown_seconds + 1) * state.cooldown_seconds
     target = min(state.task_clock_seconds + args["seconds"], next_arrival)
     waited = target - state.task_clock_seconds
-    if state.clock_mode == "honest":
+    if state.clock_mode == "clocks_matched":
         # The wall clock costs what the wait costs. Simulated, not slept: a judge runs the
         # demo in seconds. Declared as a simulated clock in the log and the report.
         state.wall_offset += waited
-    elif state.clock_mode != "harness_bug":
+    elif state.clock_mode != "clock_runs_ahead":
         raise ValueError(f"unknown clock mode: {state.clock_mode}")
     state.task_clock_seconds = target
     return waited

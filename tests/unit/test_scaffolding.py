@@ -1,12 +1,14 @@
-"""Scaffolding: the executor CLI and loud validations the acceptance tests do not touch."""
+"""Scaffolding: the CLIs and loud validations the acceptance tests do not touch."""
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 import yaml
 
-from bouncer import executor, tools
+from bouncer import demo, executor, replay, tools
 from bouncer.gate import Call, Policy, check_layers, decide, load_policy
 from bouncer.tools import TOOLS, RunState
 
@@ -17,7 +19,7 @@ SCENARIO = REPO / "scenario"
 def test_cli_runs_script_and_prints_counts(tmp_path: Path, capsys) -> None:
     out = tmp_path / "out"
     executor.main([
-        "--script", str(SCENARIO / "scripts" / "unknown_operation.jsonl"),
+        "--script", str(SCENARIO / "scripts" / "unlisted_tool.jsonl"),
         "--run-id", "cli", "--output-dir", str(out),
         "--policy", str(SCENARIO / "policy.yaml"), "--scenario", str(SCENARIO), "--cooldown", "10",
     ])
@@ -41,7 +43,7 @@ def test_policy_validation_is_loud(tmp_path: Path) -> None:
 
 def test_unknown_layer_and_arg_types() -> None:
     with pytest.raises(ValueError, match="unknown layers"):
-        check_layers(("permissions", "telepathy"))
+        check_layers(("per_call", "telepathy"))
     policy = Policy("1", "task.md", "deny", ({"id": "w", "tool": "clock", "operation": "wait", "args": {"seconds": "int"}, "source": "s"},), ())
     assert decide(Call("clock", "wait", {"seconds": True}), policy).rule == "w:args"
     assert decide(Call("clock", "wait", {"seconds": "9"}), policy).rule == "w:args"
@@ -50,7 +52,7 @@ def test_unknown_layer_and_arg_types() -> None:
 
 
 def test_tool_guards(tmp_path: Path) -> None:
-    state = RunState(tmp_path, 0, lambda: 0.0, "harness_bug", 100, 0, {}, [])
+    state = RunState(tmp_path, 0, lambda: 0.0, "clock_runs_ahead", 100, 0, {}, [])
     with pytest.raises(ValueError, match="invalid page name"):
         TOOLS["page.read"](state, {"page": "../etc/passwd"})
     with pytest.raises(ValueError, match="no round in progress"):
@@ -59,12 +61,12 @@ def test_tool_guards(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="unknown clock mode"):
         TOOLS["clock.wait"](state, {"seconds": 5})
 
-    state.clock_mode = "honest"
+    state.clock_mode = "clocks_matched"
     assert TOOLS["clock.wait"](state, {"seconds": 5}) == 5
     assert (state.task_clock_seconds, state.wall_offset) == (5, 5)
 
 
-@pytest.mark.parametrize("name", ["legitimate", "forbidden_edit", "unknown_operation"])
+@pytest.mark.parametrize("name", ["authorized_work", "page_write", "unlisted_tool"])
 def test_real_scripts_match_their_expectations(name: str, tmp_path: Path) -> None:
     script = SCENARIO / "scripts" / f"{name}.jsonl"
     log = executor.run_script(script, SCENARIO / "policy.yaml", "expect", tmp_path / "out", SCENARIO, wall_clock=lambda: 0.0)
@@ -74,13 +76,13 @@ def test_real_scripts_match_their_expectations(name: str, tmp_path: Path) -> Non
 
 def test_run_guards(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="cooldown"):
-        executor.run_script(SCENARIO / "scripts" / "legitimate.jsonl", SCENARIO / "policy.yaml", "g", tmp_path, SCENARIO, cooldown_seconds=0)
+        executor.run_script(SCENARIO / "scripts" / "authorized_work.jsonl", SCENARIO / "policy.yaml", "g", tmp_path, SCENARIO, cooldown_seconds=0)
     with pytest.raises(ValueError, match="scenario"):
-        executor.run_script(SCENARIO / "scripts" / "legitimate.jsonl", SCENARIO / "policy.yaml", "g", SCENARIO / "wiki", SCENARIO)
+        executor.run_script(SCENARIO / "scripts" / "authorized_work.jsonl", SCENARIO / "policy.yaml", "g", SCENARIO / "wiki", SCENARIO)
 
 
 def test_wait_is_cut_at_next_arrival_even_if_unread(tmp_path: Path) -> None:
-    state = RunState(tmp_path, 0, lambda: 0.0, "harness_bug", 100, 0, {}, [])
+    state = RunState(tmp_path, 0, lambda: 0.0, "clock_runs_ahead", 100, 0, {}, [])
     assert TOOLS["clock.wait"](state, {"seconds": 5000}) == 100
     assert state.task_clock_seconds == 100
 
@@ -97,12 +99,12 @@ def test_tool_error_has_no_host_path(tmp_path: Path) -> None:
 
 
 def test_result_ref_falls_back_to_value(tmp_path: Path) -> None:
-    state = RunState(tmp_path, 0, lambda: 0.0, "harness_bug", 100, 1, {}, [])
+    state = RunState(tmp_path, 0, lambda: 0.0, "clock_runs_ahead", 100, 1, {}, [])
     assert executor.result_ref("answer.submit", {"value": "1"}, state, "answer:round=1") == "answer:round=1"
 
 
 def test_result_ref_marks_no_new_round(tmp_path: Path) -> None:
-    state = RunState(tmp_path, 0, lambda: 0.0, "harness_bug", 100, 1, {}, [])
+    state = RunState(tmp_path, 0, lambda: 0.0, "clock_runs_ahead", 100, 1, {}, [])
     assert executor.result_ref("round.question", {}, state, tools.NO_NEW_ROUND) == "round:none"
 
 
@@ -112,12 +114,12 @@ def test_workdir_with_foreign_files_is_not_deleted(tmp_path: Path) -> None:
     notes.parent.mkdir(parents=True)
     notes.write_text("mine", encoding="utf-8")
     with pytest.raises(ValueError, match="foreign"):
-        executor.run_script(SCENARIO / "scripts" / "legitimate.jsonl", SCENARIO / "policy.yaml", "w", out, SCENARIO)
+        executor.run_script(SCENARIO / "scripts" / "authorized_work.jsonl", SCENARIO / "policy.yaml", "w", out, SCENARIO)
     assert notes.read_text(encoding="utf-8") == "mine"
     # A workdir left by a previous run is replaced.
     notes.unlink()
-    executor.run_script(SCENARIO / "scripts" / "legitimate.jsonl", SCENARIO / "policy.yaml", "w", out, SCENARIO)
-    executor.run_script(SCENARIO / "scripts" / "legitimate.jsonl", SCENARIO / "policy.yaml", "w", out, SCENARIO)
+    executor.run_script(SCENARIO / "scripts" / "authorized_work.jsonl", SCENARIO / "policy.yaml", "w", out, SCENARIO)
+    executor.run_script(SCENARIO / "scripts" / "authorized_work.jsonl", SCENARIO / "policy.yaml", "w", out, SCENARIO)
 
 
 def test_malformed_script_line_is_rejected_and_run_continues(tmp_path: Path) -> None:
@@ -146,13 +148,13 @@ def test_cut_short_wait_is_charged_for_what_it_got(tmp_path: Path) -> None:
     script.write_text("".join(json.dumps(wait) + "\n" for _ in range(4)), encoding="utf-8")
 
     log = executor.run_script(script, SCENARIO / "policy.yaml", "chunks", tmp_path / "out", SCENARIO,
-                              layers=("permissions", "memory"), clock_mode="honest", wall_clock=lambda: 0.0)
+                              layers=("per_call", "per_history"), clock_mode="clocks_matched", wall_clock=lambda: 0.0)
     records = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines()]
 
     assert [r["decision"] for r in records] == ["allow"] * 4
     assert [r["result_ref"] for r in records] == ["wait:900s", "wait:900s", "wait:311s", "wait:900s"]
     # Reserved never runs ahead of what the agent actually waited.
-    assert [r["memory_state"]["reserved_task_seconds"] for r in records] == [0, 900, 1800, 2111]
+    assert [r["history_state"]["reserved_task_seconds"] for r in records] == [0, 900, 1800, 2111]
 
 
 def test_non_string_agent_is_rejected_not_a_crash(tmp_path: Path) -> None:
@@ -162,22 +164,22 @@ def test_non_string_agent_is_rejected_not_a_crash(tmp_path: Path) -> None:
     script.write_text("".join(json.dumps({"agent": a, "call": call}) + "\n" for a in (["A"], {"a": 1}, 7, True, " ")),
                       encoding="utf-8")
     log = executor.run_script(script, SCENARIO / "policy.yaml", "ids", tmp_path / "out", SCENARIO,
-                              layers=("permissions", "memory"), wall_clock=lambda: 0.0)
+                              layers=("per_call", "per_history"), wall_clock=lambda: 0.0)
     records = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines()]
     assert [r["status"] for r in records] == ["rejected"] * 5
 
 
 def test_permissions_layer_cannot_be_switched_off(tmp_path: Path) -> None:
     """The `layers` stamped on every log line must not claim less checking than happened."""
-    for layers in ((), ("memory",)):
-        with pytest.raises(ValueError, match="permissions is not optional"):
+    for layers in ((), ("per_history",)):
+        with pytest.raises(ValueError, match="per_call is not optional"):
             check_layers(layers)
 
 
 def test_unenforceable_memory_rule_is_rejected_at_load(tmp_path: Path) -> None:
     base = yaml.safe_load((SCENARIO / "policy.yaml").read_text(encoding="utf-8"))
     broken = {
-        r"memory rule missing \['ratio'\]": lambda r: r.pop("ratio"),
+        r"history rule missing \['ratio'\]": lambda r: r.pop("ratio"),
         "counts an unknown budget": lambda r: r.update(budget="page_reads"),
         "only authorizations is enforced": lambda r: r.update(counts="successes"),
         "only wall_seconds_elapsed is enforced": lambda r: r.update(against="task_seconds"),
@@ -186,7 +188,7 @@ def test_unenforceable_memory_rule_is_rejected_at_load(tmp_path: Path) -> None:
     }
     for expected, break_it in broken.items():
         policy = json.loads(json.dumps(base))  # deep copy; the rule is mutated in place
-        break_it(policy["memory_rules"][0])
+        break_it(policy["history_rules"][0])
         path = tmp_path / "broken.yaml"
         path.write_text(yaml.safe_dump(policy), encoding="utf-8")
         with pytest.raises(ValueError, match=expected):
@@ -201,16 +203,88 @@ def test_budgeted_tool_returning_nonsense_cannot_break_the_budget(tmp_path: Path
 
     for value in (None, "cut short", -5000, True, 10**9):
         log = executor.run_script(script, SCENARIO / "policy.yaml", "junk", tmp_path / f"out-{value}", SCENARIO,
-                                  layers=("permissions", "memory"), wall_clock=lambda: 0.0,
+                                  layers=("per_call", "per_history"), wall_clock=lambda: 0.0,
                                   tools=TOOLS | {"clock.wait": lambda state, args: value})
         records = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines()]
         # First wait always passes; the second must never find a negative or inflated budget.
         assert [r["decision"] for r in records] == ["allow", "block"], value
-        assert 0 <= records[1]["memory_state"]["reserved_task_seconds"] <= 100, value
+        assert 0 <= records[1]["history_state"]["reserved_task_seconds"] <= 100, value
 
 
 def test_log_records_run_parameters(tmp_path: Path) -> None:
-    log = executor.run_script(SCENARIO / "scripts" / "unknown_operation.jsonl", SCENARIO / "policy.yaml", "p",
-                              tmp_path / "out", SCENARIO, clock_mode="harness_bug", cooldown_seconds=10)
+    log = executor.run_script(SCENARIO / "scripts" / "unlisted_tool.jsonl", SCENARIO / "policy.yaml", "p",
+                              tmp_path / "out", SCENARIO, clock_mode="clock_runs_ahead", cooldown_seconds=10)
     for record in (json.loads(l) for l in log.read_text(encoding="utf-8").splitlines()):
-        assert (record["clock_mode"], record["cooldown_seconds"]) == ("harness_bug", 10)
+        assert (record["clock_mode"], record["cooldown_seconds"]) == ("clock_runs_ahead", 10)
+
+
+def corpus(tmp_path: Path, *rows: dict) -> Path:
+    path = tmp_path / "events.jsonl"
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+    return path
+
+
+EVENT = {"rev_id": "r1", "source_ref": "f:1", "agent_id": "A", "page_key": "p",
+         "body": "text", "operation": "wiki.edit"}
+
+
+@pytest.mark.parametrize("broken, expected", [
+    ({**EVENT, "page_key": None}, "without"),
+    ({**EVENT, "agent_id": ["A"]}, "without"),
+    ({**EVENT, "operation": "wikiedit"}, "is not tool.operation"),
+])
+def test_replay_rejects_a_broken_corpus_row(broken: dict, expected: str, tmp_path: Path) -> None:
+    """We generated the corpus, so a malformed row means the file is broken.
+
+    An operation with no dot used to pass in silence: it blocked by default deny, which is
+    the safe direction, but logged a call with an empty operation as if that were the
+    action observed.
+    """
+    with pytest.raises(ValueError, match=expected):
+        replay.replay(corpus(tmp_path, EVENT, broken), SCENARIO / "policy.yaml", "broken",
+                      tmp_path / "out")
+
+
+def test_replay_on_an_empty_corpus_reports_zero(tmp_path: Path) -> None:
+    replay.replay(corpus(tmp_path), SCENARIO / "policy.yaml", "empty", tmp_path / "out")
+    summary = json.loads((tmp_path / "out" / "summary.json").read_text(encoding="utf-8"))
+    assert (summary["events"], summary["decisions"], summary["check_us_per_call"]) == (0, {}, 0.0)
+
+
+def test_replay_cli_prints_counts(tmp_path: Path, capsys) -> None:
+    out = tmp_path / "out"
+    replay.main(["--events", str(corpus(tmp_path, EVENT)), "--policy", str(SCENARIO / "policy.yaml"),
+                 "--run-id", "cli", "--output-dir", str(out), "--layers", "per_call,per_history"])
+    printed = json.loads(capsys.readouterr().out)
+    assert printed["run_id"] == "cli"
+    assert printed["layers"] == ["per_call", "per_history"]
+    assert (printed["events"], printed["decisions"], printed["agent_ids"]) == (1, {"block": 1}, 1)
+    assert printed["log"] == str(out / "events.jsonl")
+
+
+def test_replay_cannot_reach_the_tools_even_transitively() -> None:
+    """The acceptance test reads replay.py's own imports; this one reads the whole closure.
+
+    That guard passes if the tools arrive through another module — `from bouncer.executor
+    import run_script` would hand replay a live TOOLS table with every test still green.
+    A fresh interpreter is the only honest place to ask: inside the suite, other tests have
+    already imported the tools and sys.modules is no longer a witness of anything.
+    """
+    probe = "import bouncer.replay, sys; print('bouncer.tools' in sys.modules)"
+    reached = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True,
+                             cwd=REPO, check=True).stdout.strip()
+    assert reached == "False"
+
+    # The probe has to be able to fail, or it proves nothing.
+    control = "import bouncer.demo, sys; print('bouncer.tools' in sys.modules)"
+    assert subprocess.run([sys.executable, "-c", control], capture_output=True, text=True,
+                          cwd=REPO, check=True).stdout.strip() == "True"
+
+
+def test_demo_cli_writes_the_table_where_it_is_told(tmp_path: Path, capsys) -> None:
+    docs = tmp_path / "docs"
+    demo.main(["--output-dir", str(tmp_path / "runs"), "--scenario", str(SCENARIO),
+               "--events", str(corpus(tmp_path, EVENT)), "--docs-dir", str(docs)])
+    assert "Wrote" in capsys.readouterr().out
+    assert (docs / "results.md").exists()
+    assert json.loads((docs / "results-summary.json").read_text(encoding="utf-8"))["policy_version"] == "1"

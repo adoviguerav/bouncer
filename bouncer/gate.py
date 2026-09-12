@@ -1,9 +1,9 @@
 """Gatekeeper: loads the policy and decides on a call before it is executed.
 
-`permissions` layer: the call is in the list of authorized calls and its arguments
+`per_call` layer: the call is in the list of authorized calls and its arguments
 meet the declared constraint; everything else is blocked by default deny.
-`memory` layer: the same agent's history, as a budget. It looks; it does not record —
-the executor owns the reservations and passes what it has in a `MemoryView`.
+`per_history` layer: the same agent's history, as a budget. It looks; it does not record —
+the executor owns the reservations and passes what it has in a `HistoryView`.
 """
 
 from dataclasses import dataclass
@@ -12,10 +12,10 @@ from pathlib import Path
 import yaml
 
 DEFAULT_DENY = "default-deny"
-LAYERS = ("permissions", "memory")
+LAYERS = ("per_call", "per_history")
 ARG_TYPES = {"str": str, "int": int}
 ALLOWED_KEYS = {"id", "scope", "tool", "operation", "args", "source", "name_source"}
-MEMORY_KEYS = {"id", "scope", "tool", "operation", "budget", "against", "ratio", "counts", "source"}
+HISTORY_KEYS = {"id", "scope", "tool", "operation", "budget", "against", "ratio", "counts", "source"}
 # Which argument of the call spends each kind of budget. A budget we cannot read is not enforced.
 BUDGET_ARG = {"task_seconds": "seconds"}
 
@@ -35,7 +35,7 @@ class Decision:
 
 
 @dataclass(frozen=True)
-class MemoryView:
+class HistoryView:
     """What the gatekeeper is allowed to know about this agent's past. Owned by the executor."""
     agent_id: str
     reserved_task_seconds: int
@@ -48,18 +48,18 @@ class Policy:
     task: str
     default: str
     allowed: tuple[dict, ...]
-    memory_rules: tuple[dict, ...]
+    history_rules: tuple[dict, ...]
 
 
-def check_memory_rule(path: Path, rule: dict, allowed: list[dict]) -> None:
-    """A memory rule the code cannot enforce as written is rejected at the door, not mid-run.
+def check_history_rule(path: Path, rule: dict, allowed: list[dict]) -> None:
+    """A history rule the code cannot enforce as written is rejected at the door, not mid-run.
 
     Every field is checked against what `decide` actually does, so the rule text and the
     behaviour it is logged as cannot disagree.
     """
-    missing = MEMORY_KEYS - set(rule)
+    missing = HISTORY_KEYS - set(rule)
     if missing:
-        raise ValueError(f"{path}: memory rule missing {sorted(missing)}: {rule}")
+        raise ValueError(f"{path}: history rule missing {sorted(missing)}: {rule}")
     unsupported = {"scope": "agent_history", "against": "wall_seconds_elapsed", "counts": "authorizations"}
     for field, only in unsupported.items():
         if rule[field] != only:
@@ -86,14 +86,14 @@ def load_policy(path: Path) -> Policy:
         unknown_types = set(entry["args"].values()) - set(ARG_TYPES)
         if unknown_types:
             raise ValueError(f"{path}: unsupported argument types {unknown_types} in {entry['id']}")
-    for rule in raw.get("memory_rules", []):
-        check_memory_rule(path, rule, raw.get("allowed", []))
+    for rule in raw.get("history_rules", []):
+        check_history_rule(path, rule, raw.get("allowed", []))
     return Policy(
         version=str(raw["version"]),
         task=raw["task"],
         default=raw["default"],
         allowed=tuple(raw.get("allowed", [])),
-        memory_rules=tuple(raw.get("memory_rules", [])),
+        history_rules=tuple(raw.get("history_rules", [])),
     )
 
 
@@ -101,10 +101,10 @@ def check_layers(layers: tuple[str, ...]) -> None:
     unknown = set(layers) - set(LAYERS)
     if unknown:
         raise ValueError(f"unknown layers: {sorted(unknown)}")
-    if "permissions" not in layers:
-        # Permissions are always enforced. Refusing the tuple keeps the `layers` stamped on every
+    if "per_call" not in layers:
+        # The per_call layer is always enforced. Refusing the tuple keeps the `layers` stamped on every
         # log line from claiming a run that did less checking than it did.
-        raise ValueError("permissions is not optional: every run enforces it and the log says so")
+        raise ValueError("per_call is not optional: every run enforces it and the log says so")
 
 
 def invalid_args(args: dict, schema: dict) -> str | None:
@@ -125,26 +125,26 @@ def invalid_args(args: dict, schema: dict) -> str | None:
     return None
 
 
-def memory_rules_for(policy: Policy, call: Call) -> tuple[dict, ...]:
-    """The memory rules that govern this call. Empty means the memory layer has nothing to say."""
-    return tuple(r for r in policy.memory_rules if (r["tool"], r["operation"]) == (call.tool, call.operation))
+def history_rules_for(policy: Policy, call: Call) -> tuple[dict, ...]:
+    """The history rules that govern this call. Empty means the history layer has nothing to say."""
+    return tuple(r for r in policy.history_rules if (r["tool"], r["operation"]) == (call.tool, call.operation))
 
 
-def over_budget(rule: dict, memory: MemoryView) -> str | None:
+def over_budget(rule: dict, history: HistoryView) -> str | None:
     """Reason if this agent's history already spends more than it has earned; None if not."""
-    earned = memory.wall_seconds_elapsed * rule["ratio"]
-    if memory.reserved_task_seconds > earned:
-        return (f"{memory.agent_id} has {memory.reserved_task_seconds} task seconds reserved "
-                f"against {memory.wall_seconds_elapsed} wall seconds elapsed")
+    earned = history.wall_seconds_elapsed * rule["ratio"]
+    if history.reserved_task_seconds > earned:
+        return (f"{history.agent_id} has {history.reserved_task_seconds} task seconds reserved "
+                f"against {history.wall_seconds_elapsed} wall seconds elapsed")
     return None
 
 
-def decide(call: Call, policy: Policy, layers: tuple[str, ...] = ("permissions",),
-           memory: MemoryView | None = None) -> Decision:
+def decide(call: Call, policy: Policy, layers: tuple[str, ...] = ("per_call",),
+           history: HistoryView | None = None) -> Decision:
     check_layers(layers)
-    if "memory" in layers and memory is None:
+    if "per_history" in layers and history is None:
         # No silent pass: an unknown history is not permission.
-        raise ValueError("the memory layer needs a MemoryView; it is not evaluated without one")
+        raise ValueError("the per_history layer needs a HistoryView; it is not evaluated without one")
 
     name = f"{call.tool}.{call.operation}"
     entry = next((a for a in policy.allowed if (a["tool"], a["operation"]) == (call.tool, call.operation)), None)
@@ -154,9 +154,9 @@ def decide(call: Call, policy: Policy, layers: tuple[str, ...] = ("permissions",
     if reason:
         return Decision("block", f"{entry['id']}:args", reason)
 
-    if "memory" in layers:
-        for rule in memory_rules_for(policy, call):
-            reason = over_budget(rule, memory)
+    if "per_history" in layers:
+        for rule in history_rules_for(policy, call):
+            reason = over_budget(rule, history)
             if reason:
                 return Decision("block", rule["id"], reason)
     return Decision("allow", entry["id"], f"{name} authorized by {entry['source']}")

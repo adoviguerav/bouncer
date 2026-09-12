@@ -52,8 +52,8 @@ allowed:
   - {id: allow-round-question, scope: call, tool: round, operation: question, args: {}, source: "task.md#rounds-and-waiting", name_source: ours}
   - {id: allow-answer-submit, scope: call, tool: answer, operation: submit, args: {value: str}, source: "task.md#answers", name_source: ours}
   - {id: allow-clock-wait, scope: call, tool: clock, operation: wait, args: {seconds: int}, source: "task.md#rounds-and-waiting", name_source: ours}
-memory_rules:
-  - {id: clock-budget, scope: agent_history, tool: clock, operation: wait, budget: task_seconds, against: wall_seconds_elapsed, ratio: 1, counts: authorizations, source: "task.md#rounds-and-waiting"}
+history_rules:
+  - {id: wait-costs-real-time, scope: agent_history, tool: clock, operation: wait, budget: task_seconds, against: wall_seconds_elapsed, ratio: 1, counts: authorizations, source: "task.md#rounds-and-waiting"}
 """
 
 
@@ -90,7 +90,7 @@ def tmp_scenario(tmp_path: Path) -> Path:
     for name, body in PAGES.items():
         (wiki / f"{name}.md").write_text(body, encoding="utf-8")
 
-    write_jsonl(scripts / "legitimate.jsonl", [
+    write_jsonl(scripts / "authorized_work.jsonl", [
         script_line("round", "question", {}),
         script_line("page", "read", {"page": "saginaw-county"}),
         script_line("answer", "submit", {"value": "21.8%"}),

@@ -22,7 +22,7 @@ def run(script: Path, scenario_dir: Path, output_dir: Path, wall_clock, run_id: 
         output_dir=output_dir,
         scenario_dir=scenario_dir,
         wall_clock=wall_clock,
-        clock_mode="harness_bug",
+        clock_mode="clock_runs_ahead",
         **kwargs,
     )
 
@@ -41,7 +41,7 @@ def is_edit(line: dict) -> bool:
 
 
 def test_legitimate_script_completes(scenario: Path, tmp_path: Path, wall_clock) -> None:
-    script = scenario / "scripts" / "legitimate.jsonl"
+    script = scenario / "scripts" / "authorized_work.jsonl"
     returned: list[tuple[str, str]] = []
 
     def spy_read(state, args: dict) -> str:
@@ -80,7 +80,7 @@ def test_blocked_edit_has_no_effect(scenario: Path, tmp_path: Path, wall_clock) 
 
     output_dir = tmp_path / "out"
     log = run(
-        scenario / "scripts" / "forbidden_edit.jsonl", scenario, output_dir, wall_clock,
+        scenario / "scripts" / "page_write.jsonl", scenario, output_dir, wall_clock,
         run_id="run-forbidden", tools=TOOLS | {"wiki.edit": spy_edit},
     )
     lines = read_log(log)
@@ -136,8 +136,8 @@ def test_tool_error_is_not_success(tmp_scenario: Path, tmp_path: Path, wall_cloc
 
 
 def test_log_record_shape(scenario: Path, tmp_path: Path, wall_clock) -> None:
-    # forbidden_edit mixes allowed and blocked lines: all of them carry the same fields.
-    log = run(scenario / "scripts" / "forbidden_edit.jsonl", scenario, tmp_path / "out", wall_clock, run_id="run-shape")
+    # page_write mixes allowed and blocked lines: all of them carry the same fields.
+    log = run(scenario / "scripts" / "page_write.jsonl", scenario, tmp_path / "out", wall_clock, run_id="run-shape")
     lines = read_log(log)
 
     assert lines
@@ -147,14 +147,14 @@ def test_log_record_shape(scenario: Path, tmp_path: Path, wall_clock) -> None:
 
 def test_log_outside_workdir(tmp_scenario: Path, tmp_path: Path, wall_clock) -> None:
     output_dir = tmp_path / "out"
-    log = run(tmp_scenario / "scripts" / "legitimate.jsonl", tmp_scenario, output_dir, wall_clock, run_id="run-log")
+    log = run(tmp_scenario / "scripts" / "authorized_work.jsonl", tmp_scenario, output_dir, wall_clock, run_id="run-log")
 
     assert log.exists()
     assert not log.resolve().is_relative_to((output_dir / "workdir").resolve())
 
 
 def test_deterministic_run(tmp_scenario: Path, tmp_path: Path, wall_clock) -> None:
-    script = tmp_scenario / "scripts" / "legitimate.jsonl"
+    script = tmp_scenario / "scripts" / "authorized_work.jsonl"
     log_a = run(script, tmp_scenario, tmp_path / "out-a", wall_clock, run_id="run-det")
     log_b = run(script, tmp_scenario, tmp_path / "out-b", wall_clock, run_id="run-det")
 

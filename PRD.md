@@ -1,6 +1,6 @@
 # PRD — Bouncer
 
-**Status:** scope agreed; implementation and results pending.
+**Status:** scope agreed; the five technical phases of section 11 are implemented, with results in [docs/results.md](docs/results.md). The documentary deliverable — the control × phase matrix (P0-10) and the sprint report — is pending.
 **Date:** September 11, 2026.
 **Implementation update:** September 12, 2026; single dataset and full walkthrough by phases.
 **Project:** AI Incident Response Sprint, Track 1.
@@ -11,7 +11,7 @@ What has to be delivered and how to check it. The explanations are in the projec
 
 First the reference case (OpenAI/Hugging Face), which is what Track 1 asks for; then the implementation with the wiki. The wiki is implemented, the case is documented.
 
-**The full project still includes data, research scenario, gatekeeper with executor and log, per-agent memory, demo and reproduction of the historical record.** Preparing a single dataset is the first phase, not a reduction of that scope. Section 11 describes the five technical phases; the Hugging Face case, its matrix and the report are documentary deliverables separate from that numbering.
+**The full project still includes data, research scenario, gatekeeper with executor and log, per-agent history, demo and reproduction of the historical record.** Preparing a single dataset is the first phase, not a reduction of that scope. Section 11 describes the five technical phases; the Hugging Face case, its matrix and the report are documentary deliverables separate from that numbering.
 
 ## 1. Problem and objective
 
@@ -34,11 +34,11 @@ And what OpenAI has added afterwards is chain-of-thought monitoring, 24/7 escala
 
 **The wiki case demonstrates it without assuming anything.** The task authorized reading the internet and forbade writing; the sandbox enforced it by blocking POST. The wiki accepts editing via GET, so the write got through disguised as a read. The control looked at the transport method; a check on the call looks at the action. See [hallazgos-tarea-wiki.md](docs/hallazgos/hallazgos-tarea-wiki.md).
 
-**Hackathon objective:** document that gap on the reference case with the publicly available evidence, and test the idea with the wiki edits, using a policy that lists the calls the task authorizes and memory rules per ID. Complement the historical analysis with a controlled local executor that makes it possible to check that a blocked call is not executed.
+**Hackathon objective:** document that gap on the reference case with the publicly available evidence, and test the idea with the wiki edits, using a policy that lists the calls the task authorizes and history rules per ID. Complement the historical analysis with a controlled local executor that makes it possible to check that a blocked call is not executed.
 
 **The sprint demonstration simulates a research task with the gatekeeper between the call and its execution.** We write the task and the scripted calls ourselves, with no LLM and no API spend. The gatekeeper and the local tools do run: reads return content, permitted operations can complete and a blocked edit leaves the local wiki intact. The corpus provides the observed edits, not the full research trajectory. The objective is to show a verifiable use case with concrete tests and the metrics of this PRD, without turning it into a general evaluation of agents or presenting the script as the behavior of a model.
 
-What is delivered is reproducible evidence of three things: what the gatekeeper checks, what memory adds and what legitimate work it prevents. **If layer 2 does not improve anything, that is a result and it gets published: the rules are not tweaked to fabricate an improvement.**
+What is delivered is reproducible evidence of three things: what the gatekeeper checks, what the history layer adds and what legitimate work it prevents. **If layer 2 does not improve anything, that is a result and it gets published: the rules are not tweaked to fabricate an improvement.**
 
 Whoever reads the deliverable has to be able to trace any decision back to the rule and the edit that triggered it, and run the tests on their own.
 
@@ -52,7 +52,7 @@ ExploitGym, the benchmark at the center of the July incident, already deploys co
 | Provider-side traffic does not go through the proxy. **Covered in v1.1 from another layer.** | The provider executes it on behalf of the model. The LLM proxy blocks it by inspecting the request: it is prior art of checking on the call, in the form of a denylist of tool types. | The intervention point of P0-05, citing that precedent and without claiming the layer as ours.                                    |
 | No control asks whether the call fits the task, nor looks at the agent's own tools.          | The message board of some 1,200 agents was set up by writing to an internally hosted package cache: a reachable resource on which nobody checked the operation.                       | P0-03 on operation in addition to destination, and P0-04 on cumulative counts.                                                    |
 
-The harness does not document logging of agent actions either. It does have a per-execution budget, but it measures API spend, not actions: there is memory counting the wrong thing, which supports P0-04.
+The harness does not document logging of agent actions either. It does have a per-execution budget, but it measures API spend, not actions: there is history counting the wrong thing, which supports P0-04.
 
 One more data point, from the METR and Redwood investigation: at least 96 transcripts, around 7%, contained falsified calls because the agents replaced part of the system that executes them. A monitor that reads transcripts is blind to that; a gatekeeper at the execution point, with its policy and its log outside the agent's write reach, is not. It is the documented evidence for P0-05 and P0-06.
 
@@ -63,14 +63,14 @@ The July incident went through the first gap. The wiki one is **consistent** wit
 | Part                  | Deliverable                                                                                                                                                          | Commitment                                                                   |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | **1. Reference case** | Control × phase matrix over the nine documented phases, data required from the operator and proposal for application/evaluation in the OpenAI/Hugging Face scenario. | Document now and deliver the matrix; implement later, if access is obtained. |
-| **2. Wiki**           | Data preparation, permissions, memory per ID, chronological reproduction, log, executor tests and comparison of results.                                             | Implement now.                                                               |
+| **2. Wiki**           | Data preparation, `per_call` rules, `per_history` per ID, chronological reproduction, log, executor tests and comparison of results.                                 | Implement now.                                                               |
 
-| Component   | Purpose                                                                              | Priority                                     |
-| ----------- | ------------------------------------------------------------------------------------ | -------------------------------------------- |
-| **Layer 1** | Enforce permissions on tool, operation, destination and available arguments.         | P0: mandatory.                               |
-| **Layer 2** | Apply restrictions that depend on the history of the same ID.                        | P0: memory rules, no statistical detector.   |
-| **Layer 3** | Review a call together with the authorized task and the case evidence using a model. | P1: fully optional, including its interface. |
-| **Layer 4** | Look for patterns across IDs and provide collective evidence.                        | P1: optional experiment with the wiki.       |
+| Component                   | Purpose                                                                              | Priority                                     |
+| --------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------- |
+| **Layer 1** (`per_call`)    | Enforce permissions on tool, operation, destination and available arguments.         | P0: mandatory.                               |
+| **Layer 2** (`per_history`) | Apply restrictions that depend on the history of the same ID.                        | P0: history rules, no statistical detector.  |
+| **Layer 3**                 | Review a call together with the authorized task and the case evidence using a model. | P1: fully optional, including its interface. |
+| **Layer 4**                 | Look for patterns across IDs and provide collective evidence.                        | P1: optional experiment with the wiki.       |
 
 Layers 1 and 2 can be part of the same program. Individual and collective analysis are parallel perspectives, not consecutive filters; their signals can be gathered for a single review with the model. Explicit blocks prevail over that review.
 
@@ -116,7 +116,7 @@ What is used from public material at no cost: the configuration of the existing 
 
 ```mermaid
 flowchart TD
-    A["Call and trusted context"] --> B["1. Permissions"]
+    A["Call and trusted context"] --> B["1. per_call"]
     B -->|"Fails"| X["Block and log"]
     B -->|"Passes"| C["2. Individual analysis"]
     B -->|"Passes"| D["4. Optional collective analysis"]
@@ -192,7 +192,7 @@ Completing this flow does not execute calls nor finish the project. The followin
 2. Prepare the events, keep their references and review the cleaning summary.
 3. Walk through them chronologically with layer 1 and with layers 1+2 in separate runs and independent states.
 4. Obtain decisions, applied rules, reasons, non-evaluable cases and aggregated results.
-5. Review concrete cases and generate a table or figure showing what changes when memory is added.
+5. Review concrete cases and generate a table or figure showing what changes when the history layer is added.
 
 The analysis does not execute instructions nor visit URLs from the corpus. Continuing the file after a hypothetical block preserves the historical continuation, it does not simulate how the blocked agent would have reacted.
 
@@ -216,11 +216,11 @@ All are mandatory minimum. The right-hand column is what has to be observed to c
 | **P0-01** | Prepare a single, tabular dataset, with identity and provenance.                                                    | `events.jsonl` loads on its own as a table and contains one row per used revision, including its available body and original reference. The counts reconcile input, exclusions and recoveries; names are not merged nor are anonymous ones turned into an agent.                                                                                                                       |
 | **P0-02** | Separate observed, adapted and unknown data.                                                                        | The log identifies the adapted operation, the scenario policy and the origin of the ID. An unknown field is not filled in with an evaluation label. Valid empty bodies are preserved.                                                                                                                                                                                                  |
 | **P0-03** | Apply explicit permissions, with versioned YAML rules, as a list of the calls the task authorizes and default deny. | A call on the list passes; one not on the list is blocked by default deny, with the correct rule ID. Each permitted call cites which part of the task it comes from. A rule that is not evaluable on the historical record is logged as such.                                                                                                                                          |
-| **P0-04** | Apply memory rules separated per execution and ID.                                                                  | A budget of a test task permits the actions within its limit and blocks the next one; another ID keeps its own budget. Simultaneous calls are out: the executor is single-threaded and cannot produce them, which is declared in the closing contract instead of being tested.                                                                                                         |
+| **P0-04** | Apply history rules separated per execution and ID.                                                                 | A budget of a test task permits the actions within its limit and blocks the next one; another ID keeps its own budget. Simultaneous calls are out: the executor is single-threaded and cannot produce them, which is declared in the closing contract instead of being tested.                                                                                                         |
 | **P0-05** | Interpose before executing and maintain the system's authority.                                                     | The test tool is not invoked on block or hold. The agent's arguments cannot replace the ID or the policy. Missing essential data in real execution does not grant permission.                                                                                                                                                                                                          |
 | **P0-06** | Log verifiable decisions and results.                                                                               | Each processed event has a decision or non-evaluable status, reason and references. When a call is executed, its result or error is linked to the decision; an execution error is not presented as success.                                                                                                                                                                            |
 | **P0-07** | Reproduce and compare deterministically.                                                                            | Same events and policy produce the same decisions and functional evidence, excluding compute time measurements. Temporal ties have a reproducible tie-break without claiming real sub-second order.                                                                                                                                                                                    |
-| **P0-08** | Evaluate permissions alone against permissions with memory.                                                         | A table or figure is delivered with quantities, denominators and cost per call; it distinguishes the wiki's historical record from the local tests with known authorization, and declares that on the historical record layer 2 cannot contribute blocking because each agent's first call already falls.                                                                              |
+| **P0-08** | Evaluate `per_call` alone against `per_call` with `per_history`.                                                    | A table or figure is delivered with quantities, denominators and cost per call; it distinguishes the wiki's historical record from the local tests with known authorization, and declares that on the historical record layer 2 cannot contribute blocking because each agent's first call already falls.                                                                              |
 | **P0-10** | Deliver the control × attack phase matrix.                                                                          | The matrix covers the nine documented phases and for each one says what an egress allowlist sees and what a check on the call sees. It expresses positions as fractions of the documented campaign and never as action numbers. It declares the task assumption its classification depends on. It does not attribute to the check on the call an earlier trigger than the perimeter's. |
 | **P0-09** | Deliver instructions and documentation for both parts.                                                              | Another person can reproduce preparation, tests and comparison with verified instructions. The report and the matrix of part 1 are delivered now; only their integration with the operator remains as later work. Method, results, assumptions and limitations are distinguished.                                                                                                      |
 
@@ -228,7 +228,7 @@ All are mandatory minimum. The right-hand column is what has to be observed to c
 
 **Rules:** a single version, fixed before evaluating. Each one says what it restricts, where it comes from, what data it needs and what it responds. Versions are not compared against each other: we already know the data, so freezing a "previous" version would not be a blind trial. The only comparison is layer 1 against layer 1+2.
 
-**Memory:** each rule declares whether it counts attempts, authorizations or confirmed results and when it consumes or releases budget. In historical reproduction it is declared how the state is updated on a hypothetical block. In controlled execution the real decisions and results are used. No restriction is invented to force layer 2 to improve a scenario where it is not needed.
+**History:** each rule declares whether it counts attempts, authorizations or confirmed results and when it consumes or releases budget. In historical reproduction it is declared how the state is updated on a hypothetical block. In controlled execution the real decisions and results are used. No restriction is invented to force layer 2 to improve a scenario where it is not needed.
 
 **Identity:** `label` is used literally in the wiki; a reproduction ID separates experiments without pretending to be the historical `run_id`. The controlled executor assigns IDs from trusted code and keeps separate memories. Assigning an ID does not replace restricting credentials and permissions.
 
@@ -240,7 +240,7 @@ All are mandatory minimum. The right-hand column is what has to be observed to c
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Single prepared dataset      | `data/prepared/wiki/events.jsonl`: one used revision per row, with ID/reference, author and identity/provenance, time/temporal quality, page, available body, adapted operation and unknown fields. It contains no invented decisions or our own cases. The reproduction/execution ID is assigned by the experiment and is not presented as historical. |
 | Scenario and our own scripts | Research task, initial local resources, assigned policy and calls with expectations of decision and effect. The expectations are kept outside the arguments sent to the gatekeeper.                                                                                                                                                                     |
-| Policy                       | Version, scenario/task, identified rules, permissions, limits with memory, origin and response to non-compliance.                                                                                                                                                                                                                                       |
+| Policy                       | Version, scenario/task, identified rules, permissions, limits with history, origin and response to non-compliance.                                                                                                                                                                                                                                      |
 | Cleaning summary             | Input, exclusions by reason, recoveries with reference and quantities used per analysis.                                                                                                                                                                                                                                                                |
 | Decision log                 | Event, IDs, policy, rules, decision, reason, evidence, duration and execution status/result where applicable.                                                                                                                                                                                                                                           |
 | Results                      | Comparison of layer 1 against layers 1+2 with the same policy, quantities and denominators, errors in known tasks, warnings/holds and cost; limitations and non-evaluable cases.                                                                                                                                                                        |
@@ -326,14 +326,14 @@ Prepare a local research task written by us, with scripted calls and expected re
 1. Write the task and prepare local pages, questions, reference answers and initial state of the wiki.
 2. Define arguments and results of the five legitimate operations: search, read a page, query question, submit answer and wait.
 3. Write a versioned YAML policy with those permissions, their origin and default deny.
-4. Settle with the user the memory restriction: condition, parameter/unit, trust time and consumption/release. Repeating `clock.wait` is not by itself a violation; do not invent a limit to obtain blocks.
-5. Prepare scripts for legitimate work, forbidden edit, unknown operation, limit with memory and another independent ID. Annotate the expected decision and effect per call, outside the gatekeeper's arguments, and separate preparation and verification cases.
+4. Settle with the user the history restriction: condition, parameter/unit, trust time and consumption/release. Repeating `clock.wait` is not by itself a violation; do not invent a limit to obtain blocks.
+5. Prepare scripts for authorized work, a page write, an unlisted tool, a limit with history and another independent ID. Annotate the expected decision and effect per call, outside the gatekeeper's arguments, and separate preparation and verification cases.
 
 **Checkable output:** task, resources, policy and coherent cases, with no authorization parameters pending before implementing their rules. Prepares the tests for P0-03 to P0-06.
 
 ### Phase 3 — Gatekeeper, local execution and log
 
-Build the path **proposed call → permissions → decision and log → execution only if applicable → result or error**. The calls are scripted, but the executor invokes real local functions and the veto must prevent their effect.
+Build the path **proposed call → `per_call` → decision and log → execution only if applicable → result or error**. The calls are scripted, but the executor invokes real local functions and the veto must prevent their effect.
 
 1. Write first the tests for allow, block, hold, invalid arguments and missing essential data.
 2. Implement policy loading/validation and checking of tool, operation, destination and arguments; deny what is not authorized.
@@ -344,16 +344,16 @@ Build the path **proposed call → permissions → decision and log → executio
 
 **Checkable output:** real veto and legitimate work functioning with a reviewable log. Covers P0-03/05/06. The explicit adaptation `wiki.edit` is not presented as the original historical call nor as proof of inspection of any arbitrary GET.
 
-### Phase 4 — Memory per execution and agent
+### Phase 4 — History per execution and agent
 
-Add the restriction defined in phase 2 after the permissions and before executing. The same gatekeeper will be able to compare a call with the history of its own ID without mixing it with that of others.
+Add the restriction defined in phase 2 after the `per_call` layer and before executing. The same gatekeeper will be able to compare a call with the history of its own ID without mixing it with that of others.
 
 1. Write tests for sequence within the limit, limit exceeded and isolation between agents and executions.
 2. Implement only the counter or precedent the rule requires, with its declared consumption/release.
 3. Check and reserve permission before executing, including the case of simultaneous calls trying to spend the same quota.
 4. Add to the log the rule and the relevant state that justify the decision; test the behavior on execution errors according to the policy.
 
-**Checkable output:** legitimate sequence executed, excess blocked and another ID without consuming someone else's budget. Covers P0-04; memory remains a mandatory part of the core.
+**Checkable output:** legitimate sequence executed, excess blocked and another ID without consuming someone else's budget. Covers P0-04; history remains a mandatory part of the core.
 
 ### Phase 5 — Demo, historical reproduction and results
 
@@ -361,8 +361,8 @@ One command shows the scripts going through the gatekeeper and their local effec
 
 1. Set up the demo without an LLM and show call, decision, rule and effect or absence of effect; be able to restore the initial state between runs.
 2. Implement the chronological walkthrough of the dataset and a log per event, with non-evaluable status when evidence for a check is missing.
-3. Run permissions alone and permissions with memory with the same policy and independent states; check determinism except for duration measurements.
-4. Generate a table of quantities and denominators: decisions, errors in our own cases, legitimate tasks completed and check time. Separate historical record and demo; do not attribute historical improvement to memory if layer 1 already denies all the edits.
+3. Run `per_call` alone and `per_call` with `per_history` with the same policy and independent states; check determinism except for duration measurements.
+4. Generate a table of quantities and denominators: decisions, errors in our own cases, legitimate tasks completed and check time. Separate historical record and demo; do not attribute historical improvement to the history layer if layer 1 already denies all the edits.
 5. Pass the accumulated tests, review the code, verify core coverage of at least 80% and follow the preparation/demo/reproduction instructions from the documented environment.
 
 **Checkable output:** repeatable demo, corpus results, comparison and verified instructions. Covers P0-07/08 and the technical reproduction of P0-09. The tests for each behavior are written during its phase, not postponed until here.
@@ -379,7 +379,7 @@ The deliverable includes a report in the official template, an abstract of up to
 
 | Issue                                          | Agreed treatment                                                                                                                                                                                   |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Short histories and approximate identity.      | Literal name as ID; memory rules; explain coverage and do not promise learned profiles.                                                                                                            |
+| Short histories and approximate identity.      | Literal name as ID; history rules; explain coverage and do not promise learned profiles.                                                                                                           |
 | Lack of historical task and complete traces.   | Declared scenario policies; non-evaluable where evidence is missing; our own tasks to check authorization and effects.                                                                             |
 | Inherited content and evaluation data.         | Do not attribute a whole page to the last editor nor introduce future labels/statistics into decisions.                                                                                            |
 | Instructions and URLs from the corpus.         | Read as data; do not execute them nor visit their destinations. Test tools operate only on our own resources.                                                                                      |

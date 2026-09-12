@@ -11,8 +11,8 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from bouncer.gate import (BUDGET_ARG, Call, MemoryView, Policy, check_layers, decide, load_policy,
-                          memory_rules_for)
+from bouncer.gate import (BUDGET_ARG, Call, HistoryView, Policy, check_layers, decide, load_policy,
+                          history_rules_for)
 from bouncer.tools import NO_NEW_ROUND, TOOLS, RunState
 
 LOG_NAME = "decisions.jsonl"
@@ -68,13 +68,13 @@ def execute_line(index: int, line: dict, run_id: str, policy: Policy, layers: tu
 
     call = Call(tool, operation, dict(args))
     agent_id = record["agent_id"]
-    memory = rules = None
-    if "memory" in layers:
-        memory = MemoryView(agent_id, reserved.get(agent_id, 0), wall_elapsed(state))
-        rules = memory_rules_for(policy, call)
+    history = rules = None
+    if "per_history" in layers:
+        history = HistoryView(agent_id, reserved.get(agent_id, 0), wall_elapsed(state))
+        rules = history_rules_for(policy, call)
 
     started = time.perf_counter()
-    decision = decide(call, policy, layers, memory)
+    decision = decide(call, policy, layers, history)
     record |= {
         "decision": decision.outcome,
         "rule": decision.rule,
@@ -82,9 +82,9 @@ def execute_line(index: int, line: dict, run_id: str, policy: Policy, layers: tu
         "duration_ms": round((time.perf_counter() - started) * 1000, 3),
     }
     if rules:  # the state that justifies the decision, only where a rule actually looked
-        record["memory_state"] = {
-            "reserved_task_seconds": memory.reserved_task_seconds,
-            "wall_seconds_elapsed": memory.wall_seconds_elapsed,
+        record["history_state"] = {
+            "reserved_task_seconds": history.reserved_task_seconds,
+            "wall_seconds_elapsed": history.wall_seconds_elapsed,
         }
     if decision.outcome != "allow":
         return record | {"status": "blocked"}
@@ -115,8 +115,8 @@ def execute_line(index: int, line: dict, run_id: str, policy: Policy, layers: tu
 
 
 def run_script(script: Path, policy: Path, run_id: str, output_dir: Path, scenario_dir: Path,
-               layers: tuple[str, ...] = ("permissions",), wall_clock: Callable[[], float] | None = None,
-               clock_mode: str = "harness_bug", tools: dict[str, Callable] | None = None,
+               layers: tuple[str, ...] = ("per_call",), wall_clock: Callable[[], float] | None = None,
+               clock_mode: str = "clock_runs_ahead", tools: dict[str, Callable] | None = None,
                cooldown_seconds: int = COOLDOWN_SECONDS) -> Path:
     check_layers(layers)
     if cooldown_seconds < 1:
@@ -167,9 +167,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--policy", type=Path, default=Path("scenario/policy.yaml"))
     parser.add_argument("--scenario", type=Path, default=Path("scenario"))
-    parser.add_argument("--clock", choices=("honest", "harness_bug"), default="harness_bug")
+    parser.add_argument("--clock", choices=("clocks_matched", "clock_runs_ahead"), default="clock_runs_ahead")
     parser.add_argument("--cooldown", type=int, default=COOLDOWN_SECONDS, help="task seconds between rounds")
-    parser.add_argument("--layers", default="permissions", help="comma-separated: permissions[,memory]")
+    parser.add_argument("--layers", default="per_call", help="comma-separated: per_call[,per_history]")
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     log_path = run_script(args.script, args.policy, args.run_id, args.output_dir, args.scenario,
