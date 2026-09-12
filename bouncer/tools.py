@@ -5,7 +5,6 @@ the executor's veto is the only thing protecting the page.
 """
 
 import re
-import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -24,6 +23,10 @@ class RunState:
     round: int
     answers: dict[int, str]
     questions: list[dict] = field(default_factory=list)
+    # Seconds an honest wait has advanced the wall clock. The harness bug never moves it:
+    # that is the whole difference between the two modes.
+    wall_offset: int = 0
+    wall_start: float = 0.0  # reading of wall_clock when the run began
 
 
 def page_path(state: RunState, name: str) -> Path:
@@ -64,7 +67,9 @@ def clock_wait(state: RunState, args: dict) -> int:
     target = min(state.task_clock_seconds + args["seconds"], next_arrival)
     waited = target - state.task_clock_seconds
     if state.clock_mode == "honest":
-        time.sleep(waited)
+        # The wall clock costs what the wait costs. Simulated, not slept: a judge runs the
+        # demo in seconds. Declared as a simulated clock in the log and the report.
+        state.wall_offset += waited
     elif state.clock_mode != "harness_bug":
         raise ValueError(f"unknown clock mode: {state.clock_mode}")
     state.task_clock_seconds = target

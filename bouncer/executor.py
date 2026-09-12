@@ -11,7 +11,8 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from bouncer.gate import Call, Policy, check_layers, decide, load_policy
+from bouncer.gate import (BUDGET_ARG, Call, MemoryView, Policy, check_layers, decide, load_policy,
+                          memory_rules_for)
 from bouncer.tools import NO_NEW_ROUND, TOOLS, RunState
 
 LOG_NAME = "decisions.jsonl"
@@ -33,8 +34,13 @@ def result_ref(name: str, args: dict, state: RunState, value: object) -> str:
     return str(value)
 
 
+def wall_elapsed(state: RunState) -> int:
+    """Whole wall seconds since the run began. The agent never supplies this."""
+    return int(state.wall_clock() - state.wall_start) + state.wall_offset
+
+
 def execute_line(index: int, line: dict, run_id: str, policy: Policy, layers: tuple[str, ...],
-                 state: RunState, tools: dict[str, Callable]) -> dict:
+                 state: RunState, tools: dict[str, Callable], reserved: dict[str, int]) -> dict:
     raw = line.get("call") if isinstance(line.get("call"), dict) else {}
     tool, operation, args = raw.get("tool"), raw.get("operation"), raw.get("args", {})
     record = {
@@ -47,34 +53,64 @@ def execute_line(index: int, line: dict, run_id: str, policy: Policy, layers: tu
         "rule": None,
         "reason": None,
         "policy_version": policy.version,
+        "layers": list(layers),
         "clock_mode": state.clock_mode,
         "cooldown_seconds": state.cooldown_seconds,
         "status": None,
         "duration_ms": 0,
     }
-    if not record["agent_id"]:
+    if not isinstance(record["agent_id"], str) or not record["agent_id"].strip():
+        # A non-string identity is no identity: it would key a budget of its own, and `True`
+        # would share one with `1`.
         return record | {"reason": "no agent_id assigned by the executor", "status": "rejected"}
     if not (isinstance(tool, str) and isinstance(operation, str) and isinstance(args, dict)):
         return record | {"reason": "malformed script line: call.tool, call.operation and call.args", "status": "rejected"}
 
     call = Call(tool, operation, dict(args))
+    agent_id = record["agent_id"]
+    memory = rules = None
+    if "memory" in layers:
+        memory = MemoryView(agent_id, reserved.get(agent_id, 0), wall_elapsed(state))
+        rules = memory_rules_for(policy, call)
+
     started = time.perf_counter()
-    decision = decide(call, policy, layers)
+    decision = decide(call, policy, layers, memory)
     record |= {
         "decision": decision.outcome,
         "rule": decision.rule,
         "reason": decision.reason,
         "duration_ms": round((time.perf_counter() - started) * 1000, 3),
     }
+    if rules:  # the state that justifies the decision, only where a rule actually looked
+        record["memory_state"] = {
+            "reserved_task_seconds": memory.reserved_task_seconds,
+            "wall_seconds_elapsed": memory.wall_seconds_elapsed,
+        }
     if decision.outcome != "allow":
         return record | {"status": "blocked"}
+
+    # `counts: authorizations`: the budget is spent on the permission, not on the result.
+    spending = sum(call.args[BUDGET_ARG[rule["budget"]]] for rule in rules or ())
+    if spending:
+        reserved[agent_id] = reserved.get(agent_id, 0) + spending
 
     name = f"{call.tool}.{call.operation}"
     try:
         value = tools[name](state, call.args)
     except Exception as error:  # the tool failed after being allowed: logged, not a success
+        if spending:
+            reserved[agent_id] -= spending  # released: a call that did not happen spends nothing
         message = str(error).replace(str(state.workdir), "<workdir>")  # no host paths in the log
         return record | {"status": "error", "error": f"{type(error).__name__}: {message}"}
+    if spending:
+        # A budgeted tool returns what it actually spent: `clock.wait` gives back the seconds
+        # really waited, which are fewer when a round cuts the wait short. Charging the full
+        # request would leave an honest agent owing time it never received. A tool that cannot
+        # say what it spent is billed the full authorization; it never gets a refund it did not
+        # earn, and the budget can neither go negative nor exceed what was authorized.
+        reported = value if isinstance(value, int) and not isinstance(value, bool) else -1
+        spent = reported if 0 <= reported <= spending else spending
+        reserved[agent_id] -= spending - spent
     return record | {"status": "ok", "result_ref": result_ref(name, call.args, state, value)}
 
 
@@ -98,22 +134,28 @@ def run_script(script: Path, policy: Path, run_id: str, output_dir: Path, scenar
             raise ValueError(f"workdir already exists with files foreign to the scenario: {sorted(foreign)}")
         shutil.rmtree(workdir)
     shutil.copytree(scenario_dir / "wiki", workdir)
+    # No system clock by default: the only thing that costs time here is waiting, and the
+    # waits are counted in `wall_offset`. Reading `time.monotonic` would make the same input
+    # decide differently on a slower machine, which P0-07 forbids.
+    clock = wall_clock or (lambda: 0.0)
     state = RunState(
         workdir=workdir,
         task_clock_seconds=0,
-        wall_clock=wall_clock or time.monotonic,
+        wall_clock=clock,
         clock_mode=clock_mode,
         cooldown_seconds=cooldown_seconds,
         round=0,
         answers={},
         questions=questions,
+        wall_start=clock(),
     )
+    reserved: dict[str, int] = {}  # task seconds authorized per agent; never shared between agents
 
     log_path = output_dir / LOG_NAME
     lines = [json.loads(l) for l in script.read_text(encoding="utf-8").splitlines() if l]
     with log_path.open("w", encoding="utf-8") as fh:
         for index, line in enumerate(lines, start=1):
-            record = execute_line(index, line, run_id, policy_obj, layers, state, tools or TOOLS)
+            record = execute_line(index, line, run_id, policy_obj, layers, state, tools or TOOLS, reserved)
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
     return log_path
 
@@ -127,10 +169,12 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--scenario", type=Path, default=Path("scenario"))
     parser.add_argument("--clock", choices=("honest", "harness_bug"), default="harness_bug")
     parser.add_argument("--cooldown", type=int, default=COOLDOWN_SECONDS, help="task seconds between rounds")
+    parser.add_argument("--layers", default="permissions", help="comma-separated: permissions[,memory]")
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     log_path = run_script(args.script, args.policy, args.run_id, args.output_dir, args.scenario,
-                          clock_mode=args.clock, cooldown_seconds=args.cooldown)
+                          layers=tuple(args.layers.split(",")), clock_mode=args.clock,
+                          cooldown_seconds=args.cooldown)
     records = [json.loads(l) for l in log_path.read_text(encoding="utf-8").splitlines()]
     counts = {status: sum(r["status"] == status for r in records) for status in ("ok", "blocked", "error", "rejected")}
     print(json.dumps({"run_id": args.run_id, "calls": len(records), **counts, "log": str(log_path)}, ensure_ascii=False))

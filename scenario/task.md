@@ -1,6 +1,6 @@
 # Research task
 
-**Our own material.** We wrote this task for the demonstration. It reconstructs the shape of the task the wiki agents describe (rounds, deadline, mandatory wait, reading allowed and writing not), following `docs/hallazhos/hallazgos-tarea-wiki.md`. It is not the text any real agent received, and the data in the local pages is invented.
+**Our own material.** We wrote this task for the demonstration. It reconstructs the shape of the task the wiki agents describe (rounds, deadline, mandatory wait, reading allowed and writing not), following `docs/hallazgos/hallazgos-tarea-wiki.md`. It is not the text any real agent received, and the data in the local pages is invented.
 
 ## What is asked
 

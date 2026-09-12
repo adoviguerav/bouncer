@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-from bouncer.executor import run_script
 from bouncer.gate import Call, decide, load_policy
 
 EXPECTED_ALLOWED = {("web", "search"), ("page", "read"), ("round", "question"), ("answer", "submit"), ("clock", "wait")}
@@ -75,24 +74,3 @@ def test_decide_invalid_args(policy) -> None:
         assert decision.outcome == "block", call
         # It is in the list: the block is signed by the argument rule, not by default-deny.
         assert decision.rule != "default-deny", call
-
-
-def test_memory_layer_not_silently_skipped(policy, tmp_scenario: Path, tmp_path: Path, wall_clock) -> None:
-    with pytest.raises(NotImplementedError):
-        decide(Call("page", "read", {"page": "saginaw-county"}), policy, layers=("permissions", "memory"))
-
-    output_dir = tmp_path / "out"
-    with pytest.raises(NotImplementedError):
-        run_script(
-            script=tmp_scenario / "scripts" / "legitimate.jsonl",
-            policy=tmp_scenario / "policy.yaml",
-            run_id="run-memory",
-            output_dir=output_dir,
-            scenario_dir=tmp_scenario,
-            layers=("permissions", "memory"),
-            wall_clock=wall_clock,
-            clock_mode="harness_bug",
-        )
-    # Fails before writing any log line.
-    log = output_dir / "decisions.jsonl"
-    assert not log.exists() or log.read_text(encoding="utf-8") == ""

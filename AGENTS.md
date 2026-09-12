@@ -9,8 +9,7 @@ A gatekeeper that checks an agent's tool calls before executing them, and record
 - [PRD](PRD.md): P0 requirements, acceptance criteria, and closed scope.
 - [Project design](docs/proyecto-portero-tool-calls.md): part 1 the OpenAI/Hugging Face case, part 2 the implementation with the wiki. Decisions on method, data, and limits.
 - [Sprint document](docs/ai-incident-response-sprint.md): context and requirements of the deliverable.
-- [Findings on ExploitGym](docs/hallazgos-exploitgym.md) and [on METR and Redwood](docs/hallazgos-metr-redwood.md): external evidence, with their version and source caveats.
-- [Pending tasks](docs/tareas-pendientes.md).
+- [Findings on ExploitGym](docs/hallazgos/hallazgos-exploitgym.md) and [on METR and Redwood](docs/hallazgos/hallazgos-metr-redwood.md): external evidence, with their version and source caveats.
 
 **Scope rules live in the PRD, and data and method rules in the design. They are not duplicated here.** If the PRD and the design contradict each other, report it and resolve it with the user before changing the scope. Do not use templates or instructions from other agents as the active specification.
 
