@@ -19,8 +19,8 @@
       "history_governed_by_rule": {},
       "non_evaluable_rules": [],
       "blocked_state_update": "the walk updates no history state, on a block or on an allow. These events already happened, so there is no authorization to reserve against: each one is decided against an empty history for its own agent. The policy counts authorizations, so a block would reserve nothing in any case, and every event of this record is blocked",
-      "check_seconds_total": 0.009711,
-      "check_us_per_call": 0.711
+      "check_seconds_total": 0.009376,
+      "check_us_per_call": 0.686
     },
     {
       "run_id": "demo-replay-per_call+per_history",
@@ -46,8 +46,8 @@
         }
       ],
       "blocked_state_update": "the walk updates no history state, on a block or on an allow. These events already happened, so there is no authorization to reserve against: each one is decided against an empty history for its own agent. The policy counts authorizations, so a block would reserve nothing in any case, and every event of this record is blocked",
-      "check_seconds_total": 0.009303,
-      "check_us_per_call": 0.681
+      "check_seconds_total": 0.009164,
+      "check_us_per_call": 0.671
     }
   ],
   "scripts": [

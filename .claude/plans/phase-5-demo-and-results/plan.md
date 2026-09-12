@@ -448,6 +448,17 @@ run_script`) le daba las herramientas con todo en verde. Añadida
     limpio. 72/72 verdes. Datos viejos borrados (`results/`, `docs/results.md`,
     `docs/results-summary.json`) y todo regenerado desde cero.
 
+- **Corrección de encuadre (Adolfo, 12-09-2026).** La tabla y el README decían «la capa 2 no
+  aporta bloqueo en el registro histórico». Adolfo señaló que eso está mal encuadrado: las
+  capas son una tubería, y `per_history` solo ve lo que `per_call` ya autorizó. En el corpus
+  `per_call` no autoriza nada, así que el denominador de la capa 2 **no es 13.661, es 0**:
+  no sacó un cero, no llegó a tener muestra. Escribirlo como «0 de 13.661» lo hacía parecer
+  un suspenso cuando es la capa 1 funcionando. Reescrito en `demo.py` (`LAYER2_ON_THE_RECORD`,
+  y la columna pasa de «governed by a history rule» a «reached layer 2») y en el README.
+  **Lo que sí se mantiene, y es más pequeño:** la capa 2 no tiene prueba contra datos reales,
+  porque el corpus no contiene ni una llamada de las que ella gobierna. Es un límite de los
+  datos, no del método.
+
 - **Resultados verificados tras los arreglos (12-09-2026).** 72/72 pruebas verdes en 0,59 s.
   Cobertura 97 % (`demo.py` 92 %, `replay.py` 92 %, resto igual o mejor; baja respecto al 99 %
   porque los arreglos añadieron ramas de error que ninguna prueba recorre). Corpus: 13.661

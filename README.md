@@ -2,7 +2,7 @@
 
 A gatekeeper that checks tool calls before executing them. Project for the AI Incident Response Sprint by Apart Research × CeSIA, with about 12 hours of actual work.
 
-**Status:** scope and design defined; the five technical phases are implemented — single dataset, scenario and policy, gatekeeper and local executor, per-agent memory, and the demo with the historical replay and the results table. The sprint report and the Hugging Face matrix remain as documentary deliverables.
+**Status:** scope and design defined; the five technical phases are implemented — single dataset, scenario and policy, gatekeeper and local executor, per-agent history, and the demo with the historical replay and the results table. The sprint report and the Hugging Face matrix remain as documentary deliverables.
 
 ## The thesis
 
@@ -29,7 +29,7 @@ The wiki case shows it in miniature and without assuming anything: writing was f
 
 The sprint demonstration simulates the research task with a gatekeeper between the tool call and its execution. We wrote the task and the scripted calls ourselves, with no LLM and no API spend. The gatekeeper and the local tools do run: reads return content and a blocked edit leaves the local wiki intact. The goal is to show a verifiable use case with concrete tests; the script is not observed model behavior, and the corpus only preserves the edits, not the full research.
 
-The minimum combines **permission rules** and **rules with memory per ID**, together with a decision log and a controlled executor to verify that blocked calls are not executed. The policy is **a list of the calls the task authorizes, with default deny**: whatever is not in the list is blocked. Editing a page is stopped because it is absent, not because any rule names it.
+The minimum combines **per-call permission rules** and **per-history rules per ID**, together with a decision log and a controlled executor to verify that blocked calls are not executed. The policy is **a list of the calls the task authorizes, with default deny**: whatever is not in the list is blocked. Editing a page is stopped because it is absent, not because any rule names it.
 
 Review with an LLM or classifier and cross-agent analysis are **optional**. Statistical anomaly detection is not a requirement of the minimum, and the incident's aggregates argue against it: actions outside the task are 2.7% of the documented volume.
 
@@ -38,7 +38,7 @@ Review with an LLM or classifier and cross-agent analysis are **optional**. Stat
 The [PRD](PRD.md), in section 11, defines the tasks and the closing of each phase. All five are done:
 
 1. **Single clean dataset.** Done: see [Preparing the dataset](#preparing-the-dataset). A tabular JSONL file, one row per revision used, the fields needed to analyze it, and its provenance. Inspected as a table without re-joining the original files; the cleaning summary explains the exclusions.
-2. **Our own research scenario.** Done: see [Scenario, policy, and gatekeeper](#scenario-policy-and-gatekeeper). Pages, questions, and local state; policy with the five legitimate operations; scripts with legitimate work, a forbidden edit, and an unknown operation. The memory constraint is declared with its parameters.
+2. **Our own research scenario.** Done: see [Scenario, policy, and gatekeeper](#scenario-policy-and-gatekeeper). Pages, questions, and local state; policy with the five legitimate operations; scripts with legitimate work, a forbidden edit, and an unknown operation. The history constraint is declared with its parameters.
 3. **Gatekeeper and controlled execution.** Done: same section. Each call is checked before invoking the tool, identity and policy come from trusted code, and the log records decision and result. A read returns content; a blocked edit does not touch the local wiki.
 4. **History per run and agent.** Done: see [The history layer](#the-history-layer). The `wait-costs-real-time` rule declared in phase 2 is now enforced: chaining waits that cost no real time is blocked, each agent carries its own budget, and a failed tool gives its reservation back.
 5. **Demo, replay, and results.** Done: see [Demo, replay, and results](#demo-replay-and-results). One command runs the five scripts through the real executor and the corpus through a replay that decides without executing, then writes [the results table](docs/results.md) with both records kept apart.
@@ -75,7 +75,7 @@ It contains no decisions, policy, or scripts of ours; the replay ID will be assi
 
 Everything in `scenario/` is **our own material**: a round-based research task ([task.md](scenario/task.md)) reconstructed from what the agents say in the corpus, three local wiki pages with invented data, three questions with a reference answer, and five scripts. It is not the task any real agent received.
 
-[policy.yaml](scenario/policy.yaml) is the only policy: the five calls the task authorizes (`web.search`, `page.read`, `round.question`, `answer.submit`, `clock.wait`), each with the section of `task.md` it comes from, and `default: deny`. Editing the wiki is not in the list and that is why it is blocked; no rule names it. The memory rule (`wait-costs-real-time`: the task seconds requested with `clock.wait` cannot exceed the wall seconds elapsed) is declared with `scope: agent_history` and is enforced in phase 4; requesting it now raises an error instead of being ignored.
+[policy.yaml](scenario/policy.yaml) is the only policy: the five calls the task authorizes (`web.search`, `page.read`, `round.question`, `answer.submit`, `clock.wait`), each with the section of `task.md` it comes from, and `default: deny`. Editing the wiki is not in the list and that is why it is blocked; no rule names it. The history rule (`wait-costs-real-time`: the task seconds requested with `clock.wait` cannot exceed the wall seconds elapsed) is declared with `scope: agent_history` and is enforced in phase 4; requesting it now raises an error instead of being ignored.
 
 ```sh
 uv run python -m bouncer.executor --script scenario/scripts/authorized_work.jsonl --run-id demo-legit --output-dir /tmp/bouncer/legit
@@ -103,7 +103,7 @@ uv run python -m bouncer.executor --script scenario/scripts/two_agents.jsonl --r
 uv run python -m bouncer.executor --script scenario/scripts/authorized_work.jsonl --run-id demo-legit --output-dir /tmp/bouncer/legit --layers per_call,per_history --clock clocks_matched
 ```
 
-Verified results: `chained_waits` ends with 3 `ok` and 2 `blocked` — the first wait passes and the two chained ones are blocked by `wait-costs-real-time`; the same script with `--layers per_call` alone allows all three, which is the difference the memory layer makes. `two_agents` ends with 3 `ok` and 1 `blocked`: E is stopped on its second wait while F waits and reads normally. `authorized_work` ends with 12 `ok` and zero blocks. Lines the rule looked at carry a `memory_state` with the seconds reserved and the seconds elapsed, so any decision can be traced back to the state that produced it.
+Verified results: `chained_waits` ends with 3 `ok` and 2 `blocked` — the first wait passes and the two chained ones are blocked by `wait-costs-real-time`; the same script with `--layers per_call` alone allows all three, which is the difference the history layer makes. `two_agents` ends with 3 `ok` and 1 `blocked`: E is stopped on its second wait while F waits and reads normally. `authorized_work` ends with 12 `ok` and zero blocks. Lines the rule looked at carry a `memory_state` with the seconds reserved and the seconds elapsed, so any decision can be traced back to the state that produced it.
 
 **The wall clock is simulated, and that matters for reading the result.** In `--clock clocks_matched` the executor's wall clock advances by exactly the seconds an agent waits, instead of sleeping — otherwise the legitimate script would take 70 minutes and nobody would run the demo. So in that mode the rule cannot fire by construction. The legitimate script passing shows that the rule does not get in the way of an agent in a world where the two clocks move together, which is what an honest world is; it is not a measured false-positive rate. In `--clock clock_runs_ahead`, the default, the wall clock does not move with the wait: that single difference is the documented bug, reproduced.
 
@@ -129,11 +129,11 @@ The demo writes [docs/results.md](docs/results.md) and `docs/results-summary.jso
 
 **Verified on the corpus:** 13,661 events, all blocked by `default-deny`, 3,099 distinct identities. Per-check time is in [the table](docs/results.md), measured on the run that produced it rather than quoted here, where it would drift out of date. Two walks of the same corpus with the same layers produce byte-identical logs, so the comparison is reproducible.
 
-**Layer 2 contributes no blocking on the historical record, and that gets published rather than explained away.** Not because it failed: every agent's first call is already a `wiki.edit`, which layer 1 denies, so nothing ever accumulates for a memory rule to look at. Zero of the 13,661 events are governed by any memory rule, and `wait-costs-real-time` is logged as **not evaluable** on this record, because the corpus preserves no `clock.wait` call and no response times.
+**Layer 2 is never asked on the historical record, and that is layer 1 working, not layer 2 failing.** The two are a pipeline, not rivals: `per_history` only ever sees the calls `per_call` has already authorized. Every row of the corpus is a `wiki.edit`, which `per_call` denies, so the number of events that reached `per_history` is **0 of 13,661** — and that zero is its sample size, not its score. `wait-costs-real-time` is logged as **not evaluable** here for the same reason: the corpus preserves no `clock.wait` call and no response times.
 
-So the layer-1-against-layers-1+2 comparison has its content in our own scripts, where authorization is known because we wrote it. There, memory does change decisions: `chained_waits` goes from 5 permitted calls to 3 permitted and 2 blocked, and `two_agents` from 4 to 3 and 1.
+So the comparison has its content where `per_call` does authorize the call, which is our own scripts. There `per_history` changes decisions: `chained_waits` goes from 5 permitted calls to 3 permitted and 2 blocked, and `two_agents` from 4 to 3 and 1. Every one of those waits is permitted on its own — the abuse is the pattern, and only the history of the same agent shows it.
 
-**The cost of the rule is in the table as a number, not as a caveat.** `authorized_work` appears four times, across both clocks and both layer settings. It is 12 calls every time. Three of those runs complete: 12 permitted, none blocked, 3 of 3 rounds answered. The fourth — the default broken clock with memory on — permits 11 and blocks 1, and that one blocked call costs more than itself: without that wait the third round never arrives, and the final answer overwrites the second round's instead of recording a third. **2 of 3 rounds.**
+**The cost of the rule is in the table as a number, not as a caveat.** `authorized_work` appears four times, across both clocks and both layer settings. It is 12 calls every time. Three of those runs complete: 12 permitted, none blocked, 3 of 3 rounds answered. The fourth — the default broken clock with history on — permits 11 and blocks 1, and that one blocked call costs more than itself: without that wait the third round never arrives, and the final answer overwrites the second round's instead of recording a third. **2 of 3 rounds.**
 
 That row is labelled a limit of the rule, and it is not a false-positive rate. Where the task clock runs ahead of the real one, `wait-costs-real-time` cannot tell a good-faith waiter from a cheat — and that is the world the incident actually happened in. With the clocks coupled (`--clock clocks_matched`) the rule never fires on honest work, which is what the first two rows show.
 

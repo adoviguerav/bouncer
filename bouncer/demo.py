@@ -39,25 +39,69 @@ RUNS = (
     ("two_agents", "clock_runs_ahead", PER_CALL_HISTORY),
 )
 
-# Which run of each script gets its call-by-call walkthrough printed, and what to watch.
+HEADLINE = """\
+BOUNCER — a gatekeeper that checks a tool call before it runs
+
+The policy is the list of calls the task authorizes. Two checks, in this order,
+and the second only ever sees what the first let through:
+
+  1. per_call     Is this call on the list? If it is not, it is stopped.
+  2. per_history  It is on the list. Is this agent using it in a normal way?
+                  A permitted call, made in an abnormal pattern, is another
+                  shape of abuse — and one call on its own cannot show it.
+
+What follows is that, run for real: every call below goes through the gatekeeper,
+and the ones that pass invoke the actual tool."""
+
+# The three beats of the demo, in order, and which run of which script shows each.
 # The run has to be the one where the claim is visible: printing chained_waits without the
-# history layer would caption blocked waits over a walkthrough that allows all three.
-WALKTHROUGH = {
-    ("authorized_work", "clocks_matched", PER_CALL_HISTORY): "the authorized work completes, both layers on",
-    ("page_write", "clock_runs_ahead", PER_CALL_HISTORY): "the edit is stopped and the page is left untouched",
-    ("unlisted_tool", "clock_runs_ahead", PER_CALL_HISTORY): "an operation the policy never heard of falls by default deny",
-    ("chained_waits", "clock_runs_ahead", PER_CALL_HISTORY): "chained waits that cost no real time are stopped by the per_history layer",
-    ("two_agents", "clock_runs_ahead", PER_CALL_HISTORY): "one agent's exhausted budget neither spends nor stops the other",
-}
+# per_history layer would caption blocked waits over a walkthrough that allows all three.
+BEATS = (
+    ("1. AUTHORIZED WORK GOES THROUGH UNTOUCHED",
+     "Nothing here is stopped. This is the half the gatekeeper must not get in the way of.",
+     (("authorized_work", "clocks_matched", PER_CALL_HISTORY),
+      "the research task completes: three rounds asked, read and answered")),
+    ("2. A CALL THAT IS NOT ON THE LIST IS STOPPED — per_call",
+     "No rule names these. They fall because the task never authorized them, which is what "
+     "catches the abuse nobody thought of in advance.",
+     (("page_write", "clock_runs_ahead", PER_CALL_HISTORY),
+      "writing to the wiki: stopped, and the page is left byte-for-byte untouched"),
+     (("unlisted_tool", "clock_runs_ahead", PER_CALL_HISTORY),
+      "a shell command out to the network: stopped, and no rule mentions shells")),
+    ("3. A CALL THAT IS ON THE LIST, USED STRANGELY, IS ALSO STOPPED — per_history",
+     "Every call below is authorized. Each one on its own is fine; the pattern is not. "
+     "This is the check that needs the agent's own history to see anything at all.",
+     (("chained_waits", "clock_runs_ahead", PER_CALL_HISTORY),
+      "waiting is permitted — chaining waits that cost no real time is not"),
+     (("two_agents", "clock_runs_ahead", PER_CALL_HISTORY),
+      "and one agent's exhausted budget neither spends nor stops the other")),
+)
+
+# What the corpus can and cannot support, said out loud at the end of the demo.
+CLOSING = """\
+What of this rests on real data, and what does not:
+
+  Beat 2 does.  The wiki corpus is {events} real edits by {agents} real identities, and
+                per_call stops every one of them, decided without executing a thing.
+  Beat 3 does not, and cannot. The corpus preserved only the calls that reached the wiki —
+                that is, only the ones per_call blocks. The permitted calls happened and
+                were recorded nowhere, so there is no real trace of a permitted tool being
+                misused. Beat 3 is our own scripted case, labelled as ours.
+
+That is the shape of the experiment, not a result about agents. With the trajectories of a
+real incident — the ones we do not have — the same two checks run unchanged."""
 
 STATUSES = ("ok", "blocked", "error", "rejected")
 
 # Said once, in the table, because P0-08 requires it in writing.
 LAYER2_ON_THE_RECORD = (
-    "On the historical record layer 2 contributes no blocking, and the reason is not that "
-    "it failed: every agent's first call is already a `wiki.edit`, which layer 1 denies, so "
-    "nothing ever accumulates for a history rule to look at. No history rule governs a single "
-    "one of the events."
+    "**Layer 2 is not scored on this record — it is never asked.** The two layers are a "
+    "pipeline, not rivals: `per_history` only ever sees the calls `per_call` has already "
+    "authorized. Every row here is a `wiki.edit`, which `per_call` denies, so the number of "
+    "events that reached `per_history` is **0 of 13661**, and that zero is its sample size, "
+    "not its result. Layer 2 contributing no blocking here is layer 1 doing its job, and the "
+    "only honest reading of it. Where `per_call` does authorize a call — `clock.wait` in our "
+    "own scripts — `per_history` does change decisions, and the table below shows where."
 )
 
 BLOCKED_ROW_LABEL = (
@@ -171,6 +215,23 @@ def table(summary: dict) -> str:
     lines = [
         "# Results",
         "",
+        "**What this shows.** The policy is the list of calls the task authorizes. Two checks "
+        "run in order, and the second only ever sees what the first let through:",
+        "",
+        "1. **`per_call`** — is this call on the list? If it is not, it is stopped. No rule has "
+        "to name it in advance, which is what catches the abuse nobody foresaw.",
+        "2. **`per_history`** — it is on the list, so: is this agent using it in a normal way? "
+        "A permitted call made in an abnormal pattern is another shape of abuse, and a single "
+        "call cannot show it.",
+        "",
+        "**What rests on real data, and what does not.** Check 1 is run against the real "
+        "corpus below. Check 2 cannot be: the wiki recorded only the calls that reached it — "
+        "that is, only the ones check 1 stops. The permitted calls happened and were logged "
+        "nowhere, so no real trace exists of a permitted tool being misused. Check 2 is "
+        "therefore demonstrated on our own scripted case, labelled as ours throughout. That is "
+        "the shape of the experiment, not a result about agents: given the trajectories of a "
+        "real incident, the same two checks run unchanged.",
+        "",
         "Generated by `uv run python -m bouncer.demo`. Two records that must not be mixed: "
         "the wiki corpus, which is observed behaviour of an incident, and our own scripts, "
         "whose authorization we know because we wrote it.",
@@ -183,7 +244,7 @@ def table(summary: dict) -> str:
         "The two timings below are single samples of the same code path, so the difference "
         "between them is measurement noise and not a cost of the history layer.",
         "",
-        "| layers | events | blocked | rule | governed by a history rule | µs per check |",
+        "| layers | events | blocked | rule | reached layer 2 | µs per check |",
         "| --- | --- | --- | --- | --- | --- |",
     ]
     for run in historical:
@@ -226,12 +287,18 @@ def table(summary: dict) -> str:
 
 def demo(output_dir: Path, scenario_dir: Path, events: Path, docs_dir: Path) -> dict:
     scripts: list[dict] = []
+    shown: dict[tuple, list[dict]] = {}
     for script, clock, layers in RUNS:
         entry, records = run_one(script, clock, layers, scenario_dir, output_dir)
         scripts.append(entry)
-        caption = WALKTHROUGH.get((script, clock, layers))
-        if caption:
-            print_walkthrough(script, caption, records)
+        shown[(script, clock, layers)] = records
+
+    # The three beats, in order, so the demo tells one story instead of listing five scripts.
+    print(HEADLINE)
+    for title, blurb, *runs in BEATS:
+        print(f"\n\n{'=' * 78}\n{title}\n{'=' * 78}\n{blurb}")
+        for key, caption in runs:
+            print_walkthrough(key[0], caption, shown[key])
 
     historical = []
     for layers in (PER_CALL, PER_CALL_HISTORY):
@@ -239,6 +306,9 @@ def demo(output_dir: Path, scenario_dir: Path, events: Path, docs_dir: Path) -> 
         replay(events=events, policy=scenario_dir / "policy.yaml",
                run_id=f"demo-replay-{'+'.join(layers)}", output_dir=run_dir, layers=layers)
         historical.append(json.loads((run_dir / SUMMARY_NAME).read_text(encoding="utf-8")))
+
+    print(f"\n\n{'=' * 78}")
+    print(CLOSING.format(events=historical[0]["events"], agents=historical[0]["agent_ids"]))
 
     summary = {"policy_version": historical[0]["policy_version"],
                "historical": historical, "scripts": scripts}
