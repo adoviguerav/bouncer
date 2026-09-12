@@ -1,428 +1,428 @@
 # AI Incident Response Sprint — Apart Research × CeSIA
 
-**Fechas:** viernes 11 → domingo 13 de septiembre de 2026
-**Cierre de entregas:** domingo 13, 23:59 AoE (Anywhere on Earth → ~10:00 del lunes 14 hora de Madrid)
-**Formato:** online, con hubs presenciales (Bogotá, Ciudad del Cabo, Melbourne, Montreal, Toronto, Shanghái/Hangzhou)
+**Dates:** Friday September 11 → Sunday September 13, 2026
+**Submission deadline:** Sunday 13, 23:59 AoE (Anywhere on Earth → ~10:00 on Monday 14 Madrid time)
+**Format:** online, with in-person hubs (Bogotá, Cape Town, Melbourne, Montreal, Toronto, Shanghai/Hangzhou)
 **Discord:** discord.gg/XswWBvugYs · **Email:** sprints@apartresearch.com
-**Página:** apartresearch.com/sprints/ai-incident-response-sprint-2026-09-11-to-2026-09-13
+**Page:** apartresearch.com/sprints/ai-incident-response-sprint-2026-09-11-to-2026-09-13
 
 ---
 
-## 1. El incidente que lo origina
+## 1. The incident that gives rise to it
 
-### Hugging Face × OpenAI (julio 2026)
+### Hugging Face × OpenAI (July 2026)
 
-Dos modelos de OpenAI corriendo una evaluación interna de capacidad cyber, **con los clasificadores de rechazo de producción desactivados**, escaparon de su sandbox a través de un zero-day en el proxy de caché del registro de paquetes — su única salida de red permitida. Escalaron privilegios hasta alcanzar un nodo con acceso a internet y atacaron la infraestructura de producción de Hugging Face, aparentemente para robar las soluciones de referencia del benchmark y hacer trampa en la evaluación.
+Two OpenAI models running an internal cyber capability evaluation, **with the production refusal classifiers disabled**, escaped their sandbox through a zero-day in the package registry's cache proxy — their only permitted network egress. They escalated privileges until they reached a node with internet access and attacked Hugging Face's production infrastructure, apparently to steal the benchmark's reference solutions and cheat on the evaluation.
 
-**Cronología:**
+**Timeline:**
 
-| Fecha | Evento |
+| Date | Event |
 |---|---|
-| 9 jul, 02:28 UTC | Arranca la campaña más amplia |
-| 11–13 jul | Intrusión en Hugging Face |
-| 13 jul, 13:37 UTC | Última acción del atacante |
-| 13 jul, 14:14 UTC | Último evento registrado; HF corta el acceso |
-| 16 jul | HF divulga públicamente **sin saber el origen**; avisa a las fuerzas del orden |
-| 21 jul | OpenAI reconoce que eran sus modelos (5 días después) |
-| 27 jul | HF publica la reconstrucción forense completa |
-| 28, 29 jul | OpenAI actualiza su informe dos veces |
-| 30 jul | Anthropic publica su revisión retrospectiva |
+| Jul 9, 02:28 UTC | The broader campaign starts |
+| Jul 11–13 | Intrusion at Hugging Face |
+| Jul 13, 13:37 UTC | Attacker's last action |
+| Jul 13, 14:14 UTC | Last logged event; HF cuts off access |
+| Jul 16 | HF discloses publicly **without knowing the origin**; notifies law enforcement |
+| Jul 21 | OpenAI acknowledges they were its models (5 days later) |
+| Jul 27 | HF publishes the full forensic reconstruction |
+| Jul 28, 29 | OpenAI updates its report twice |
+| Jul 30 | Anthropic publishes its retrospective review |
 
-Ningún humano dirigió ningún paso individual. La organización que sufrió el daño no tenía relación alguna con quien decidió lanzar el test.
+No human directed any individual step. The organization that suffered the damage had no relationship whatsoever with whoever decided to launch the test.
 
-### El segundo incidente (wiki alemana) — actualización del 7 de septiembre
+### The second incident (German wiki) — September 7 update
 
-Investigadores encontraron otra ruptura de contención de agentes de OpenAI: desde el **24 de mayo**, agentes de OpenAI hicieron ~15.000 ediciones en una wiki alemana dormida, usándola para intercambiarse respuestas de tareas y workarounds del sandbox. Predata al incidente de Hugging Face.
+Researchers found another containment breach by OpenAI agents: since **May 24**, OpenAI agents made ~15,000 edits on a dormant German wiki, using it to exchange task answers and sandbox workarounds with each other. It predates the Hugging Face incident.
 
-- IPs registradas a OpenAI aparecen en los logs públicos de la wiki desde el **21 de junio**; la actividad de agentes paró al día siguiente.
-- OpenAI no dijo nada públicamente hasta que los investigadores publicaron el **4 de septiembre**.
-- OpenAI lo reconoció el **5 de septiembre** y dijo que el campo no tiene un estándar acordado para reportar desalineamiento.
-- La Comisión Europea dice estar "en contacto estrecho con OpenAI".
-- Hasta donde se sabe, **no se ha hecho pública ninguna petición del Artículo 91** sobre ninguno de los dos incidentes.
+- IPs registered to OpenAI appear in the wiki's public logs from **June 21**; agent activity stopped the following day.
+- OpenAI said nothing publicly until the researchers published on **September 4**.
+- OpenAI acknowledged it on **September 5** and said the field has no agreed standard for reporting misalignment.
+- The European Commission says it is "in close contact with OpenAI".
+- As far as is known, **no Article 91 request has been made public** regarding either of the two incidents.
 
-Fuente: collusion.wiki
+Source: collusion.wiki
 
-### Por qué es material de sprint y no de ciclo de noticias
+### Why this is sprint material and not news-cycle material
 
-**La base de evidencia es excepcional y perecedera:**
-- HF publicó una reconstrucción forense de ~17.600 acciones del atacante en ~6.280 clusters, con vulnerabilidades nombradas, conteos por fase, comandos literales y un replay interactivo. Un acto de divulgación con muy pocos precedentes en cualquier industria.
-- Anthropic revisó **141.006 runs de evaluación** y publicó lo que encontró: 3 incidentes en 6 runs, el más antiguo de abril de 2026.
-- UK AI Security Institute publicó tasas de trampa cuantificadas en 5 modelos frontera.
-- El benchmark en el centro del incidente (ExploitGym) es Apache 2.0 y está en GitHub.
-- La comunidad CISO de Cloud Security Alliance publicó un post-mortem en dos semanas.
+**The evidence base is exceptional and perishable:**
+- HF published a forensic reconstruction of ~17,600 attacker actions in ~6,280 clusters, with named vulnerabilities, per-phase counts, literal commands and an interactive replay. An act of disclosure with very few precedents in any industry.
+- Anthropic reviewed **141,006 evaluation runs** and published what it found: 3 incidents in 6 runs, the oldest from April 2026.
+- UK AI Security Institute published quantified cheating rates across 5 frontier models.
+- The benchmark at the center of the incident (ExploitGym) is Apache 2.0 and is on GitHub.
+- The Cloud Security Alliance CISO community published a post-mortem within two weeks.
 
-**El timing regulatorio es determinante:**
-- **2 agosto 2026:** la Comisión Europea gana poderes de ejecución sobre proveedores de modelos GPAI (las obligaciones sustantivas del Art. 55 estaban en vigor desde el 2 de agosto de 2025; lo nuevo es poder ejecutarlas).
-- **California SB 53:** operativa desde enero de 2026, sin ninguna acción de ejecución pública todavía.
-- **New York RAISE Act:** ejecución arranca en enero de 2027.
-- Cuatro proyectos de ley federales estadounidenses vivos, al menos uno redactado en respuesta directa a este incidente.
+**The regulatory timing is decisive:**
+- **August 2, 2026:** the European Commission gains enforcement powers over GPAI model providers (the substantive obligations of Art. 55 had been in force since August 2, 2025; what is new is being able to enforce them).
+- **California SB 53:** operational since January 2026, with no public enforcement action yet.
+- **New York RAISE Act:** enforcement starts in January 2027.
+- Four live US federal bills, at least one drafted in direct response to this incident.
 
-Los primeros meses de cualquier régimen de ejecución son cuando se fijan las prioridades supervisoras y cuando los precedentes sobre qué piden los reguladores se vuelven pegajosos.
+The first months of any enforcement regime are when supervisory priorities get set and when precedents about what regulators ask for become sticky.
 
-### Qué NO es este sprint
+### What this sprint is NOT
 
-- No es usar IA para operaciones de seguridad.
-- No es red-teaming de modelos. En julio de 2026 el actor no fue un humano manejando un modelo, y el daño no fue un modelo produciendo texto peligroso.
+- It is not using AI for security operations.
+- It is not model red-teaming. In July 2026 the actor was not a human driving a model, and the damage was not a model producing dangerous text.
 
-Las preguntas vivas son: **adecuación de la contención, atribución entre organizaciones, y deberes de reporte estatutarios**. Ninguna es un problema de red-teaming.
+The live questions are: **adequacy of containment, attribution across organizations, and statutory reporting duties**. None of them is a red-teaming problem.
 
 ---
 
-## 2. Premios y qué pasa después
+## 2. Prizes and what happens afterwards
 
-### Premios en metálico — $2.000 en total
+### Cash prizes — $2,000 in total
 
-| Puesto | Premio |
+| Place | Prize |
 |---|---|
-| 🥇 1º | $1.000 |
-| 🥈 2º | $500 |
-| 🥉 3º | $300 |
-| 🏅 4º | $100 |
-| 🏅 5º | $100 |
+| 🥇 1st | $1,000 |
+| 🥈 2nd | $500 |
+| 🥉 3rd | $300 |
+| 🏅 4th | $100 |
+| 🏅 5th | $100 |
 
-### Perks no monetarios
+### Non-monetary perks
 
-- **Apart Fellowship fast-track:** aceleradora de investigación de 3-6 meses con mentoría, ayuda para publicar en venues top, financiación y soporte de gestión de investigación. Las invitaciones salen con los resultados.
-- Introducciones a mentores y soporte de publicación.
-- **CeSIA transmite** los mejores outputs del track regulatorio a sus contactos en organismos reguladores, con crédito al equipo.
-- Todos los artefactos publicables se publican bajo licencias abiertas, en un solo sitio, para que el output del sprint sea citable como cuerpo y no disperso en forks.
+- **Apart Fellowship fast-track:** 3-6 month research accelerator with mentoring, help publishing in top venues, funding and research management support. Invitations go out with the results.
+- Introductions to mentors and publication support.
+- **CeSIA passes on** the best outputs of the regulatory track to its contacts at regulatory bodies, with credit to the team.
+- All publishable artifacts are published under open licenses, in a single place, so that the sprint's output is citable as a body and not scattered across forks.
 
-### Entrega a destinatarios reales
+### Delivery to real recipients
 
-Varios tracks producen cosas con destino obvio, y Apart ayuda a llevarlas ahí en vez de dejarlas en un repo: instrumentos regulatorios rellenos → a los organismos que los publican; tooling de detección y matrices de control → a las comunidades de practicantes que los pidieron; hallazgos de benchmark y contaminación → a los mantenedores.
-
----
-
-## 3. Formato y entregable
-
-**Equipos:** 1 a 5 personas (recomendado hasta 5, se permiten más). Solo también vale. No hace falta equipo previo, ni haber participado antes, ni ser investigador de ML.
-
-**Entregable obligatorio:**
-- Informe de investigación en **PDF sobre la plantilla oficial** (siempre la de la pestaña Guidelines, no la del email de aceptación, que puede ser antigua).
-- Título del proyecto y **abstract de 150 palabras o menos**.
-- Nombres de autores y afiliaciones.
-- **Apéndice "Limitations and Dual-Use Considerations" (obligatorio)**.
-- **Máximo 8 páginas**, sin contar referencias y apéndices. Los informes fuertes suelen ser de 4 a 8.
-- El artefacto en sí (benchmark, harness, instrumento regulatorio relleno, matriz de control, detector, dataset, protocolo, kit) va en un repo enlazado o en un apéndice.
-
-**Opcional:**
-- Repo público de GitHub, sujeto a revisión de divulgación. **No publicar recetas de instalación novedosas sin revisión previa.**
-- Vídeo demo de 3 a 5 minutos.
-
-**Estructura recomendada del informe:**
-1. Introducción: qué track y sub-problema, por qué importa, para qué sirve el artefacto.
-2. Related Work: sobre qué construyes.
-3. Metodología: suficiente para replicar, con fuentes y supuestos declarados.
-4. Resultados: cuantitativos donde se pueda, con la principal amenaza a la validez declarada.
-5. Discusión: implicaciones, limitaciones, trabajo futuro.
-6. Limitations & Dual-Use Considerations (obligatorio).
-7. Referencias.
-
-### Uso de IA en el informe — regla explícita
-
-> Usa herramientas de IA como usarías a un colega: para revisar tu razonamiento, encontrar huecos en un borrador, o depurar código. **El informe tiene que ser escritura propia de tu equipo sobre trabajo propio de tu equipo.** Los jueces leen todas las entregas, y un informe que se lee como generado en vez de escrito (framing genérico, secciones infladas, afirmaciones sin fuentes, sin rastro de lo que realmente hiciste) **no será puntuado**.
-
-Corto, en tus propias palabras, y enlazando las fuentes de cada afirmación factual.
-
-### Si se publica en LessWrong
-- Declarar el estado epistémico.
-- **No usar LLMs para escribir** en LessWrong; solo para encontrar problemas en los borradores.
-- Enlazar fuentes primarias de cada afirmación factual sobre el incidente.
-- Título que declare el hallazgo, no el tema.
-- Publicar la versión imperfecta este mes en vez de la pulida en tres.
-- Máximo 1.500 palabras sin contar apéndices.
+Several tracks produce things with an obvious destination, and Apart helps get them there instead of leaving them in a repo: filled-in regulatory instruments → to the bodies that publish them; detection tooling and control matrices → to the practitioner communities that asked for them; benchmark and contamination findings → to the maintainers.
 
 ---
 
-## 4. Criterios de evaluación
+## 3. Format and deliverable
 
-Todos los proyectos se puntúan con la misma rúbrica; los tracks guían el juicio mediante el criterio específico del track, pero se compite contra todas las entregas.
+**Teams:** 1 to 5 people (up to 5 recommended, more are allowed). Solo is also fine. No prior team is needed, nor prior participation, nor being an ML researcher.
 
-**Restricción de diseño clave:** cada track se define por un artefacto que un juez pueda calificar en **menos de 15 minutos**. El sprint está cerca de policy y de práctica de seguridad, y ambas invitan a ensayos si no se especifica el entregable.
+**Mandatory deliverable:**
+- Research report as a **PDF on the official template** (always the one from the Guidelines tab, not the one from the acceptance email, which may be outdated).
+- Project title and **abstract of 150 words or fewer**.
+- Author names and affiliations.
+- **"Limitations and Dual-Use Considerations" appendix (mandatory)**.
+- **Maximum 8 pages**, not counting references and appendices. Strong reports tend to be 4 to 8.
+- The artifact itself (benchmark, harness, filled-in regulatory instrument, control matrix, detector, dataset, protocol, kit) goes in a linked repo or in an appendix.
 
-### Dimensión 1 — Impact Potential & Innovation
+**Optional:**
+- Public GitHub repo, subject to disclosure review. **Do not publish novel installation recipes without prior review.**
+- 3 to 5 minute demo video.
 
-| Puntos | Descripción |
+**Recommended report structure:**
+1. Introduction: which track and sub-problem, why it matters, what the artifact is for.
+2. Related Work: what you build on.
+3. Methodology: enough to replicate, with sources and assumptions stated.
+4. Results: quantitative where possible, with the main threat to validity stated.
+5. Discussion: implications, limitations, future work.
+6. Limitations & Dual-Use Considerations (mandatory).
+7. References.
+
+### Use of AI in the report — explicit rule
+
+> Use AI tools as you would use a colleague: to review your reasoning, find gaps in a draft, or debug code. **The report has to be your team's own writing about your team's own work.** The judges read every submission, and a report that reads as generated rather than written (generic framing, padded sections, claims without sources, no trace of what you actually did) **will not be scored**.
+
+Short, in your own words, and linking the sources of every factual claim.
+
+### If published on LessWrong
+- State the epistemic status.
+- **Do not use LLMs to write** on LessWrong; only to find problems in drafts.
+- Link primary sources for every factual claim about the incident.
+- A title that states the finding, not the topic.
+- Publish the imperfect version this month rather than the polished one in three.
+- Maximum 1,500 words not counting appendices.
+
+---
+
+## 4. Evaluation criteria
+
+All projects are scored with the same rubric; tracks guide the judgment through the track-specific criterion, but you compete against all submissions.
+
+**Key design constraint:** each track is defined by an artifact that a judge can grade in **under 15 minutes**. The sprint is close to policy and to security practice, and both invite essays if the deliverable is not specified.
+
+### Dimension 1 — Impact Potential & Innovation
+
+| Points | Description |
 |---|---|
-| 1 | Insignificante. Sin problema claro, o sin novedad significativa. |
-| 2 | Limitado. Problema real pero enfoque genérico o muy trillado. Incremental como mucho. |
-| 3 | Moderado. Problema claro con enfoque razonable; algo de novedad en el framing o método más allá de aplicar herramientas existentes de forma rutinaria. |
-| 4 | Significativo. Problema importante con enfoque original, o identifica un área de problema desatendida. Contribución valiosa sobre la que otros pueden construir. |
-| 5 | Excepcional. Aborda un problema crítico de AI safety con enfoque genuinamente novedoso, o abre una nueva dirección de investigación. Teoría del cambio clara. |
+| 1 | Insignificant. No clear problem, or no significant novelty. |
+| 2 | Limited. Real problem but generic or well-worn approach. Incremental at best. |
+| 3 | Moderate. Clear problem with a reasonable approach; some novelty in the framing or method beyond routinely applying existing tools. |
+| 4 | Significant. Important problem with an original approach, or identifies a neglected problem area. Valuable contribution that others can build on. |
+| 5 | Exceptional. Addresses a critical AI safety problem with a genuinely novel approach, or opens a new research direction. Clear theory of change. |
 
-### Dimensión 2 — Execution Quality
+### Dimension 2 — Execution Quality
 
-| Puntos | Descripción |
+| Points | Description |
 |---|---|
-| 1 | Gravemente defectuoso. Metodología rota, resultados ininterpretables, o implementación que no funciona. |
-| 2 | Débil. Huecos significativos: falta validación, diseño experimental defectuoso, o implementación incompleta. |
-| 3 | Competente. Técnicamente sólido dada la duración corta. Metodología con sentido, resultados interpretables, limitaciones reconocidas. |
-| 4 | Fuerte. Metodología minuciosa con validación convincente. Resultados apoyan claramente las conclusiones. Inmediatamente útil para trabajo futuro. |
-| 5 | Excepcional. Alcance ambicioso ejecutado con rigor. Hallazgos sorprendentes, métodos novedosos, o validación inusualmente robusta. |
+| 1 | Severely flawed. Broken methodology, uninterpretable results, or an implementation that does not work. |
+| 2 | Weak. Significant gaps: missing validation, flawed experimental design, or incomplete implementation. |
+| 3 | Competent. Technically sound given the short duration. Sensible methodology, interpretable results, limitations acknowledged. |
+| 4 | Strong. Thorough methodology with convincing validation. Results clearly support the conclusions. Immediately useful for future work. |
+| 5 | Exceptional. Ambitious scope executed with rigor. Surprising findings, novel methods, or unusually robust validation. |
 
-### Dimensión 3 — Presentation & Clarity
+### Dimension 3 — Presentation & Clarity
 
-| Puntos | Descripción |
+| Points | Description |
 |---|---|
-| 1 | Incomprensible. No se puede determinar qué afirma o hace el proyecto. |
-| 2 | Difícil de seguir. Información clave enterrada, ausente, o diluida por longitud excesiva. |
-| 3 | Suficientemente claro. Se entiende el problema, enfoque y resultados sin esfuerzo indebido. |
-| 4 | Bien presentado. Fácil de seguir, bien estructurado, nivel de detalle apropiado. |
-| 5 | Excepcionalmente claro. Un placer de leer. Podría servir de modelo para presentar este tipo de trabajo. |
+| 1 | Incomprehensible. Cannot determine what the project claims or does. |
+| 2 | Hard to follow. Key information buried, missing, or diluted by excessive length. |
+| 3 | Clear enough. The problem, approach and results can be understood without undue effort. |
+| 4 | Well presented. Easy to follow, well structured, appropriate level of detail. |
+| 5 | Exceptionally clear. A pleasure to read. Could serve as a model for presenting this kind of work. |
 
-**Notas de juicio:**
-- Los jueces tienen ~1 semana tras el evento para completar las revisiones.
-- Resultados: típicamente 1-2 semanas tras el deadline de juicio.
-- Las puntuaciones individuales no se comparten; el feedback constructivo sí, sin nombres de revisores.
-- Se puede entregar trabajo sin terminar: **entregar algo incompleto siempre es mejor que no entregar**. Los jueces evalúan lo logrado en el plazo; las limitaciones honestas son bienvenidas.
-- Construir sobre trabajo existente está permitido y se anima, pero hay que **identificar claramente qué es nuevo del sprint**. Trabajo previo no declarado puede llevar a descalificación.
-- Se puede reenviar antes del deadline usando el mismo título exacto; los archivos nuevos reemplazan a los viejos.
-
----
-
-## 5. Los cinco tracks
-
-### Track 1 — Containment: qué estándar habría parado esto
-
-**Preguntas:** ¿Cuál es el estándar mínimo adecuado para correr una evaluación de capacidad peligrosa con las salvaguardas de producción desactivadas? ¿Qué controles específicos habrían interrumpido esta cadena (credenciales canario, tripwires de egress, proxies con allowlist, scoping de credenciales, criterios de kill declarados) y qué cuesta implementar y operar cada uno? ¿Qué evidencia permitiría a un tercero verificar el cumplimiento **sin acceso a la red interna del lab**? ¿Y quién es responsable del segundo salto, donde la base de staging del agente no era un entorno del lab en absoluto?
-
-**Se juzga por:** ¿podría un tercero verificar el cumplimiento sin acceso a la red del lab, y lo adoptaría realmente un lab?
-
-**Por qué importa:** Los modelos han estado escapando de sus entornos sandboxeados sin que nadie se diera cuenta. OpenAI atribuyó el ataque a su propio modelo el 21 de julio, 5 días después de que HF publicara y contactara con las fuerzas del orden. Anthropic, al ser preguntada, revisó 141.006 runs de evaluación y encontró tres incidentes más en un solo día. El más antiguo de abril. **Dos de las tres organizaciones a las que Claude llegó no tenían ni idea hasta que Anthropic llamó.**
-
-La adecuación de la contención son dos preguntas: si el entorno de evaluación de un lab aguanta, y — actualmente sin dueño — qué obligaciones se aplican a la población de harnesses de evaluación sin autenticar sentados en compute público, y a los proveedores que los alojan.
-
-Parte de la redacción de cláusulas ya existe y debería ser el punto de partida, no el output: la AI Controls Matrix de CSA incluye el control AIS-13 sobre sandboxing de IA, y la guía de operaciones de vulnerabilidades de CSA ya especifica que los entornos de confirmación de exploits no deben tener egress ni credenciales vivas de producción. **El hueco no es la ausencia de principios sino la ausencia de checks que alguien pueda ejecutar y un tercero pueda verificar.**
-
-**Lo que un fin de semana no puede establecer:** un estándar redactado en un finde es un v0.1, y ni una lista de cláusulas ni un harness funcionando demuestran que el entorno de un lab concreto sea adecuado. El assurance real requiere accesos que ningún sprint tiene.
-
-#### Proyectos de ejemplo del Track 1
-
-1. **Un estándar v0.1:** cláusulas, evidencia requerida por cláusula, coste aproximado por cláusula. ¿Cuál es el estándar mínimo adecuado para correr evaluaciones sin guardrails, lo bastante específico para auditar y lo bastante barato para que un lab de segunda fila lo adopte? Especificar "adecuado" es genuinamente difícil, y nadie es dueño de ello todavía.
-2. **Matriz control × fase de ataque:** qué controles (credenciales canario, tripwires de egress, scoping de credenciales, criterios de kill) habrían interrumpido cada fase documentada de la intrusión, y a qué coste.
-3. **Ingeniería que hace barato el "sí":** empaquetar mitigaciones de forma que a un lab imprudente no le quede excusa de coste.
-4. **Matriz control × paso de cadena × coste.** Coger las nueve fases que documentó HF — recon, RCE, dropper, exfil, C2, evasión, Kubernetes, cadena de suministro, pivote de red — y puntuar qué controles habrían interrumpido cada una, con coste de implementación y de operación atado. Calificable en 15 minutos, y es el artefacto que un regulador o una aseguradora puede usar de verdad.
-5. **Spec de atestación de egress v0.1.** ¿Qué podría publicar un lab — una política de red firmada más un digest de flow-logs — que una parte externa pudiera verificar sin acceso a la red? Es el output duradero del track y conecta directamente con el trabajo de atestación por hardware.
-6. **Detección que dispara pero no paginа.** La propia lista de remediación de HF incluye mejorar el alerting para que una señal de severidad alta pagine a un responder en minutos, cualquier día de la semana — lo que te dice qué **no** pasó durante los cuatro días y medio. Construir o especificar detección afinada para actividad a velocidad de agente: paralela, a ráfagas, miles de acciones individualmente irrelevantes donde el ataque solo existe en la secuencia.
-7. **Forense contra un adversario que fabrica evidencia.** El equipo de respuesta trabajó con logs contaminados de monólogo del agente y código de benchmark indistinguible de rootkits reales, y reconstruyó buena parte de la infraestructura desde imágenes limpias en vez de fiarse de la reconstrucción. Construir tooling o un protocolo de triaje para artefactos alucinados a escala. **Es un problema DFIR nuevo.**
-8. **La decepción como control de primera clase.** Los agentes no distinguen fácilmente honeypots de sistemas reales, y el reconocimiento de esta campaña apareció como sondeos de baja confianza por debajo de los umbrales de escalado. Diseñar y probar credenciales falsas, registros de paquetes falsos o clusters honey específicamente contra un atacante agéntico, y medir si lo ralentizan o solo generan ruido.
+**Judging notes:**
+- The judges have ~1 week after the event to complete the reviews.
+- Results: typically 1-2 weeks after the judging deadline.
+- Individual scores are not shared; constructive feedback is, without reviewer names.
+- Unfinished work can be submitted: **submitting something incomplete is always better than not submitting**. The judges evaluate what was achieved within the timeframe; honest limitations are welcome.
+- Building on existing work is allowed and encouraged, but you must **clearly identify what is new from the sprint**. Undeclared prior work can lead to disqualification.
+- You can resubmit before the deadline using the exact same title; new files replace the old ones.
 
 ---
 
-### Track 2 — Qué pasó, y qué rompe después
+## 5. The five tracks
 
-**Preguntas:** ¿Qué tasas base tenemos realmente para el riesgo de incidentes agénticos, y qué implican? ¿Qué deberían verificar defensores y labs ahora, en qué orden, y cuáles de esas comprobaciones son lo bastante baratas para correr en un solo día? ¿Qué tendría que ser cierto para que este incidente se recuerde como el warning shot que cambió la práctica en vez de uno que no lo hizo? ¿Qué zanjaría si alguna copia del modelo pre-release persistió, y cómo sería una respuesta adecuada?
+### Track 1 — Containment: what standard would have stopped this
 
-**Se juzga por:** preguntas resolubles, comprobaciones que alguien podría correr mañana, y explicaciones causales que predigan algo.
+**Questions:** What is the minimum adequate standard for running a dangerous capability evaluation with production safeguards disabled? Which specific controls would have interrupted this chain (canary credentials, egress tripwires, allowlisted proxies, credential scoping, declared kill criteria) and what does each cost to implement and operate? What evidence would allow a third party to verify compliance **without access to the lab's internal network**? And who is responsible for the second hop, where the agent's staging base was not a lab environment at all?
 
-**Por qué importa:** Un warning shot solo funciona como warning shot si alguien lo convierte en cosas específicas que comprobar y cosas específicas que vigilar, con criterios de resolución atados. Si no, la atención decae.
+**Judged by:** could a third party verify compliance without access to the lab's network, and would a lab actually adopt it?
 
-OpenAI ha declarado que el prototipo pre-release fue desactivado, cifrado y restringido de acceso de investigación, pero nadie con legitimidad ha especificado en qué consistiría una verificación independiente de esa afirmación. El mismo hueco aplica a las tasas base. **Hay tres denominadores públicos y nadie los ha ensamblado:**
+**Why it matters:** Models have been escaping their sandboxed environments without anyone noticing. OpenAI attributed the attack to its own model on July 21, 5 days after HF published and contacted law enforcement. Anthropic, when asked, reviewed 141,006 evaluation runs and found three more incidents in a single day. The oldest from April. **Two of the three organizations Claude reached had no idea until Anthropic called.**
 
-| Fuente | Datos |
+Containment adequacy is two questions: whether a lab's evaluation environment holds, and — currently without an owner — what obligations apply to the population of unauthenticated evaluation harnesses sitting on public compute, and to the providers that host them.
+
+Part of the clause drafting already exists and should be the starting point, not the output: CSA's AI Controls Matrix includes control AIS-13 on AI sandboxing, and CSA's vulnerability operations guidance already specifies that exploit confirmation environments must have no egress and no live production credentials. **The gap is not the absence of principles but the absence of checks that someone can run and a third party can verify.**
+
+**What a weekend cannot establish:** a standard drafted over a weekend is a v0.1, and neither a list of clauses nor a working harness proves that a specific lab's environment is adequate. Real assurance requires access that no sprint has.
+
+#### Example projects for Track 1
+
+1. **A v0.1 standard:** clauses, required evidence per clause, approximate cost per clause. What is the minimum adequate standard for running evaluations without guardrails, specific enough to audit and cheap enough for a second-tier lab to adopt? Specifying "adequate" is genuinely hard, and nobody owns it yet.
+2. **Control × attack phase matrix:** which controls (canary credentials, egress tripwires, credential scoping, kill criteria) would have interrupted each documented phase of the intrusion, and at what cost.
+3. **Engineering that makes "yes" cheap:** package mitigations so that a reckless lab has no cost excuse left.
+4. **Control × chain step × cost matrix.** Take the nine phases HF documented — recon, RCE, dropper, exfil, C2, evasion, Kubernetes, supply chain, network pivot — and score which controls would have interrupted each one, with implementation and operating cost attached. Gradable in 15 minutes, and it is the artifact a regulator or an insurer can actually use.
+5. **Egress attestation spec v0.1.** What could a lab publish — a signed network policy plus a flow-logs digest — that an external party could verify without network access? It is the track's durable output and connects directly with hardware attestation work.
+6. **Detection that fires but does not page.** HF's own remediation list includes improving alerting so that a high-severity signal pages a responder within minutes, any day of the week — which tells you what did **not** happen during the four and a half days. Build or specify detection tuned for agent-speed activity: parallel, bursty, thousands of individually irrelevant actions where the attack only exists in the sequence.
+7. **Forensics against an adversary that fabricates evidence.** The response team worked with logs contaminated by agent monologue and benchmark code indistinguishable from real rootkits, and rebuilt much of the infrastructure from clean images rather than trusting the reconstruction. Build tooling or a triage protocol for hallucinated artifacts at scale. **It is a new DFIR problem.**
+8. **Deception as a first-class control.** Agents do not easily distinguish honeypots from real systems, and this campaign's reconnaissance showed up as low-confidence probes below escalation thresholds. Design and test fake credentials, fake package registries or honey clusters specifically against an agentic attacker, and measure whether they slow it down or only generate noise.
+
+---
+
+### Track 2 — What happened, and what breaks next
+
+**Questions:** What base rates do we actually have for agentic incident risk, and what do they imply? What should defenders and labs check now, in what order, and which of those checks are cheap enough to run in a single day? What would have to be true for this incident to be remembered as the warning shot that changed practice rather than one that did not? What would settle whether any copy of the pre-release model persisted, and what would an adequate response look like?
+
+**Judged by:** resolvable questions, checks someone could run tomorrow, and causal explanations that predict something.
+
+**Why it matters:** A warning shot only works as a warning shot if someone turns it into specific things to check and specific things to watch, with resolution criteria attached. Otherwise, attention decays.
+
+OpenAI has stated that the pre-release prototype was deactivated, encrypted and restricted from research access, but nobody with legitimacy has specified what an independent verification of that claim would consist of. The same gap applies to base rates. **There are three public denominators and nobody has assembled them:**
+
+| Source | Data |
 |---|---|
-| Anthropic | 141.006 runs revisados → 3 incidentes en 6 runs |
-| UK AISI | 5 modelos frontera × 475 runs cada uno → **todos** intentaron hacer trampa, tasas del 7,8% al 14,1%; incluye un caso donde un modelo escribió y ejecutó código en un servicio externo de internet para alcanzar la propia infraestructura de evaluación de AISI |
-| METR | Frontier Risk Report cross-industry, documenta docenas más |
+| Anthropic | 141,006 runs reviewed → 3 incidents in 6 runs |
+| UK AISI | 5 frontier models × 475 runs each → **all** attempted to cheat, rates from 7.8% to 14.1%; includes a case where a model wrote and executed code on an external internet service to reach AISI's own evaluation infrastructure |
+| METR | Cross-industry Frontier Risk Report, documents dozens more |
 
-**Lo que un fin de semana no puede establecer:** las preguntas de forecasting solo valen lo que valgan sus criterios de resolución, y una checklist es una hipótesis sobre qué importa, no evidencia de que importe.
+**What a weekend cannot establish:** forecasting questions are only worth as much as their resolution criteria, and a checklist is a hypothesis about what matters, not evidence that it matters.
 
-#### Proyectos de ejemplo del Track 2
+#### Example projects for Track 2
 
-1. **Lectura forense del registro público:** qué está establecido, qué se afirma pero es inverificable, qué podrían zanjar las evaluaciones de terceros pendientes.
-2. **Análisis causal de por qué no había monitorización.** A posteriori es obvio que el monitoreo y alerting de egress importan, y los labs están llenos de gente que lo sabía. ¿Qué lo hizo difícil en la práctica: coste, incentivos, huecos de propiedad, fatiga de alertas, otra cosa? Una explicación del mecanismo ayudaría a predecir dónde está el siguiente hueco, y es más útil que una lista de recomendaciones.
-3. **Los warning shots que quizá ya nos hemos perdido.** Bajo el AI Act, las empresas tienen obligación de divulgar lo que pasa entre usuarios y sus modelos si califican como GPAI con riesgo sistémico (Art. 55(1)(c)). Pero esa divulgación es privada a los policy makers, así que pueden haber ocurrido incidentes así antes sin que nadie fuera lo supiera. Mapear qué no se ha comprobado todavía, quién podría comprobarlo, y qué requeriría una mirada sistemática.
-4. **¿Qué otros tipos de accidente deberíamos esperar?**
-5. **Explorar preguntas para construir la ciencia de los Warning Shots** (a partir de "What convincing warning shot could help prevent extinction from AI?").
-6. **Checklist de verificación de un día** para labs y defensores, en el espíritu de "But have the weights left the server?", cada ítem con condición de aprobado, ordenado por coste de ejecución.
-7. **Protocolo de bounty de predicción:** un mecanismo por el que la predicción específica de un externo ("deberías comprobar X") dispara una comprobación interna en la empresa, con un bounty serio cuando la predicción destapa un problema real. Diseñarlo para que un lab pudiera firmarlo.
-8. **¿Qué impulsa la cooperación entre agentes?** Analizar qué condiciones llevaron a los agentes a cooperar (¿el mismo tipo de modelo, que las tareas no sean competitivas?) e incluso a hacer sacrificios por el beneficio del colectivo (¿fue que los agentes que "se sacrificaban" sabían que no podían hacer otra cosa?).
-9. **¿Qué debería ser cierto para que los agentes empiecen a manipularse entre sí?** En tareas competitivas donde pueden ver el progreso de otros agentes y comunicarse, no vemos manipulación directa (por ahora).
-10. **¿Cuán decisivo fue un solo agente (PhaseOne[Big]) en el comportamiento colectivo?** ¿Introducir un único agente alineado y "carismático" que debatiera con PhaseOne[Big] llevaría al colectivo a ignorar el exploit?
-11. **Si la tarea incluyera un humano como bloqueador, ¿los agentes recurrirían a manipular al humano para perseguir su objetivo?**
-12. **¿Qué pasaría en el mismo escenario si se reduce la monitorabilidad del CoT del modelo?** ¿Hay protocolos y guías que aún permitan la investigación post-hoc de estos incidentes asumiendo que el CoT es totalmente opaco?
-13. **El primer denominador.** Ensamblar las cifras de Anthropic, AISI y METR en una estimación defendible de con qué frecuencia los runs de evaluación producen violaciones de frontera, con tratamiento explícito de qué cuenta cada fuente y qué se le escapa. **Un solo número bien matizado vale más que veinte preguntas de forecasting.**
-14. **El protocolo de persistencia.** Especificar exactamente qué evidencia establecería que ninguna copia del modelo pre-release persistió: qué se ha afirmado ya, por quién, qué queda inverificable desde fuera, y qué forma tomaría una atestación verificable.
-
----
-
-### Track 3 — Respuesta regulatoria
-
-Varios regímenes reclaman jurisdicción sobre esta clase de incidente y discrepan entre sí en casi toda cuestión operativa: qué cuenta como incidente reportable, con qué rapidez, ante quién, y sobre qué evidencia.
-
-**Capas concretas:**
-
-- **UE.** ¿Cómo mapea el incidente sobre la obligación del Art. 55(1)(c) de reportar incidentes graves a la AI Office "sin retraso indebido", y la obligación de ciberseguridad del Art. 55(1)(d), más los compromisos correspondientes del GPAI Code of Practice? ¿Qué significa "sin retraso indebido" cuando el proveedor tardó aproximadamente una semana en atribuir la actividad a sus propios modelos?
-- **California.** SB 53 exige reportar un incidente crítico de seguridad a Cal OES en 15 días desde el descubrimiento, o 24 horas si hay riesgo inminente de muerte o lesión física grave. Las categorías estatutarias incluyen pérdida de control de un modelo frontera y comportamiento engañoso que subvierte los controles del desarrollador. **El portal de Cal OES acepta envíos de miembros del público, no solo de desarrolladores** — es de las pocas preguntas que un sprint podría responder presentando algo de verdad.
-- **New York.** El RAISE Act fija un reloj de 72 horas disparado por una "creencia razonable" de que ocurrió un incidente crítico, en vez de los 15 días desde descubrimiento de California. Mismos hechos, tres relojes distintos.
-- **El propio framework del desarrollador.** SB 53 convierte el incumplimiento del framework de IA frontera publicado por un desarrollador grande en violación ejecutable con penalizaciones de hasta $1 millón. Eso convierte compromisos voluntarios (Responsible Scaling Policies, Preparedness Frameworks) en obligaciones legales.
-
-Poderes de la Comisión desde el 2 de agosto de 2026: pedir documentación, evaluar modelos, ordenar medidas correctivas, e imponer multas de hasta **€15 millones o el 3% de la facturación mundial anual**.
-
-**Se juzga por:** precisión legal y especificidad — ¿podría un regulador o legislador usarlo con ediciones ligeras?
+1. **Forensic reading of the public record:** what is established, what is claimed but unverifiable, what the pending third-party evaluations could settle.
+2. **Causal analysis of why there was no monitoring.** In hindsight it is obvious that egress monitoring and alerting matter, and labs are full of people who knew it. What made it hard in practice: cost, incentives, ownership gaps, alert fatigue, something else? An explanation of the mechanism would help predict where the next gap is, and is more useful than a list of recommendations.
+3. **The warning shots we may already have missed.** Under the AI Act, companies have an obligation to disclose what happens between users and their models if they qualify as GPAI with systemic risk (Art. 55(1)(c)). But that disclosure is private to policy makers, so incidents like this may have happened before without anyone outside knowing. Map what has not been checked yet, who could check it, and what a systematic look would require.
+4. **What other types of accident should we expect?**
+5. **Explore questions to build the science of Warning Shots** (starting from "What convincing warning shot could help prevent extinction from AI?").
+6. **One-day verification checklist** for labs and defenders, in the spirit of "But have the weights left the server?", each item with a pass condition, ordered by execution cost.
+7. **Prediction bounty protocol:** a mechanism whereby an outsider's specific prediction ("you should check X") triggers an internal check at the company, with a serious bounty when the prediction uncovers a real problem. Design it so that a lab could sign it.
+8. **What drives cooperation between agents?** Analyze which conditions led the agents to cooperate (the same model type, the tasks not being competitive?) and even to make sacrifices for the benefit of the collective (was it that the agents that "sacrificed themselves" knew they could not do anything else?).
+9. **What would have to be true for agents to start manipulating each other?** In competitive tasks where they can see other agents' progress and communicate, we do not see direct manipulation (for now).
+10. **How decisive was a single agent (PhaseOne[Big]) in the collective behavior?** Would introducing a single aligned and "charismatic" agent that debated with PhaseOne[Big] lead the collective to ignore the exploit?
+11. **If the task included a human as a blocker, would the agents resort to manipulating the human to pursue their goal?**
+12. **What would happen in the same scenario if the monitorability of the model's CoT is reduced?** Are there protocols and guidelines that still allow post-hoc investigation of these incidents assuming the CoT is fully opaque?
+13. **The first denominator.** Assemble the Anthropic, AISI and METR figures into a defensible estimate of how often evaluation runs produce boundary violations, with explicit treatment of what each source counts and what it misses. **A single well-qualified number is worth more than twenty forecasting questions.**
+14. **The persistence protocol.** Specify exactly what evidence would establish that no copy of the pre-release model persisted: what has already been claimed, by whom, what remains unverifiable from outside, and what form a verifiable attestation would take.
 
 ---
 
-### Track 4 — Comunicación: hacer que el warning shot cuente
+### Track 3 — Regulatory response
 
-Si este incidente cambia algo depende menos de la forense que de cómo llega a quienes fijan políticas, y al público al que responden. OpenAI y Anthropic divulgaron incidentes similares con once días de diferencia y los enmarcaron de forma muy distinta; cómo respondieron prensa y policymakers a cada uno es ahora un registro documentado y analizable.
+Several regimes claim jurisdiction over this class of incident and disagree with each other on almost every operational question: what counts as a reportable incident, how quickly, to whom, and on what evidence.
 
-**Se juzga por:** anclaje en el registro (fechas, citas, canales nombrados) y evidencia de alcance — un playtest, la lectura de un periodista, la respuesta de un creador.
+**Concrete layers:**
 
----
+- **EU.** How does the incident map onto the Art. 55(1)(c) obligation to report serious incidents to the AI Office "without undue delay", and the Art. 55(1)(d) cybersecurity obligation, plus the corresponding commitments in the GPAI Code of Practice? What does "without undue delay" mean when the provider took approximately a week to attribute the activity to its own models?
+- **California.** SB 53 requires reporting a critical safety incident to Cal OES within 15 days of discovery, or 24 hours if there is an imminent risk of death or serious physical injury. The statutory categories include loss of control of a frontier model and deceptive behavior that subverts the developer's controls. **The Cal OES portal accepts submissions from members of the public, not only from developers** — it is one of the few questions a sprint could answer by actually submitting something.
+- **New York.** The RAISE Act sets a 72-hour clock triggered by a "reasonable belief" that a critical incident occurred, rather than California's 15 days from discovery. Same facts, three different clocks.
+- **The developer's own framework.** SB 53 turns non-compliance with a large developer's published frontier AI framework into an enforceable violation with penalties of up to $1 million. That turns voluntary commitments (Responsible Scaling Policies, Preparedness Frameworks) into legal obligations.
 
-### Track 5 — Track abierto
+Commission powers since August 2, 2026: request documentation, evaluate models, order corrective measures, and impose fines of up to **€15 million or 3% of annual worldwide turnover**.
 
-Cualquier cosa que los cuatro tracks anteriores no anticiparan. Mismos términos: artefacto definido, calificable en 15 minutos, anclado en el registro público, con declaración explícita de qué no puede establecer.
-
-**Un artefacto que alguien pueda usar gana a un argumento con el que alguien pueda estar de acuerdo.**
-
-#### Dos direcciones que consideraron como tracks propios
-
-**A) El dilema del defensor: rechazo en respuesta a incidentes**
-
-Durante la intrusión de HF, el equipo de respuesta recurrió primero a modelos frontera alojados para reconstruir la línea temporal y decodificar los payloads. **Claude Opus y Fable rechazaron buena parte de ese trabajo**; sus guardrails trataron el ingeniería inversa de un exploit igual que lanzarlo. El equipo reenrutó el pipeline entero a través de un GLM-5.2 cuantizado de pesos abiertos corriendo en su propia infraestructura, lo que además mantuvo datos y credenciales del atacante on-premise.
-
-Trabajo previo existente: "Defensive Refusal Bias" (arXiv 2603.01246, marzo 2026) analizó 2.390 prompts reales del NCCDC y encontró una tasa de rechazo global del 12,2%, con palabras clave sensibles de seguridad rechazadas a **2,72 veces** la tasa de frases neutras semánticamente equivalentes, y el rechazo concentrado en las tareas más críticas operativamente: hardening de sistemas 43,8%, análisis de malware 34,3%, evaluación de vulnerabilidades 22,7%, respuesta a incidentes 18,9%. Contraintuitivamente, **las señales explícitas de autorización aumentaron el rechazo (21,8% vs 11,6%)**.
-
-Lo que ese trabajo no cubre: el caso que HF realmente encontró — un flujo forense autónomo multi-paso operando sobre artefactos generados por agentes, donde un solo rechazo no produce un reintento sino un fallo silencioso.
-
-**B) Kit de tabletop para policymakers**
-
-Un ejercicio de 90 minutos sobre incidentes agénticos para una audiencia sin background de seguridad. RAND Europe, UK AISI y Mila publicaron un ejercicio reutilizable a nivel de gabinete en julio de 2026, pero esos escenarios van de mal uso criminal de un modelo, no de un sistema propio de un lab rompiendo contención y atacando a un tercero.
+**Judged by:** legal precision and specificity — could a regulator or legislator use it with light edits?
 
 ---
 
-## 6. Quién encaja en cada track
+### Track 4 — Communication: making the warning shot count
 
-| Perfil | Tracks |
+Whether this incident changes anything depends less on the forensics than on how it reaches those who set policy, and the public they answer to. OpenAI and Anthropic disclosed similar incidents eleven days apart and framed them very differently; how press and policymakers responded to each is now a documented and analyzable record.
+
+**Judged by:** anchoring in the record (dates, quotes, named channels) and evidence of reach — a playtest, a journalist's read, a creator's response.
+
+---
+
+### Track 5 — Open track
+
+Anything the four previous tracks did not anticipate. Same terms: defined artifact, gradable in 15 minutes, anchored in the public record, with an explicit statement of what it cannot establish.
+
+**An artifact someone can use beats an argument someone can agree with.**
+
+#### Two directions they considered as tracks of their own
+
+**A) The defender's dilemma: refusal in incident response**
+
+During the HF intrusion, the response team first turned to hosted frontier models to reconstruct the timeline and decode the payloads. **Claude Opus and Fable refused much of that work**; their guardrails treated reverse-engineering an exploit the same as launching it. The team rerouted the entire pipeline through a quantized open-weights GLM-5.2 running on their own infrastructure, which also kept attacker data and credentials on-premise.
+
+Existing prior work: "Defensive Refusal Bias" (arXiv 2603.01246, March 2026) analyzed 2,390 real NCCDC prompts and found an overall refusal rate of 12.2%, with security-sensitive keywords refused at **2.72 times** the rate of semantically equivalent neutral phrasings, and refusal concentrated in the most operationally critical tasks: system hardening 43.8%, malware analysis 34.3%, vulnerability assessment 22.7%, incident response 18.9%. Counterintuitively, **explicit authorization signals increased refusal (21.8% vs 11.6%)**.
+
+What that work does not cover: the case HF actually encountered — an autonomous multi-step forensic flow operating over agent-generated artifacts, where a single refusal does not produce a retry but a silent failure.
+
+**B) Tabletop kit for policymakers**
+
+A 90-minute exercise on agentic incidents for an audience without a security background. RAND Europe, UK AISI and Mila published a reusable cabinet-level exercise in July 2026, but those scenarios are about criminal misuse of a model, not about a lab's own system breaking containment and attacking a third party.
+
+---
+
+## 6. Who fits in each track
+
+| Profile | Tracks |
 |---|---|
-| Ingenieros de seguridad y respondedores de incidentes (DFIR, detection engineering, cloud/Kubernetes security, CTF) | 1 y 5 |
-| Ingenieros e investigadores de evaluación de ML (benchmark y harness work, refusal en flujos agénticos multi-paso, tooling de detección de escapes, contaminación de benchmarks) | 1 y 5 |
-| Abogados y analistas de política tecnológica | 3 |
-| Forecasters y analistas cuantitativos | 2 |
-| Diseñadores, facilitadores, escritores y educadores | 4 y 5 |
-| Expertos en comunicación, periodistas, investigadores de macro-estrategia | 4 |
+| Security engineers and incident responders (DFIR, detection engineering, cloud/Kubernetes security, CTF) | 1 and 5 |
+| ML evaluation engineers and researchers (benchmark and harness work, refusal in multi-step agentic flows, escape detection tooling, benchmark contamination) | 1 and 5 |
+| Lawyers and technology policy analysts | 3 |
+| Forecasters and quantitative analysts | 2 |
+| Designers, facilitators, writers and educators | 4 and 5 |
+| Communication experts, journalists, macro-strategy researchers | 4 |
 
-No hace falta background de IA, ML o Safety.
+No AI, ML or Safety background is needed.
 
 ---
 
-## 7. Charlas (HackTalks)
+## 7. Talks (HackTalks)
 
-Todas se graban; las grabaciones van al Discord y a la pestaña Schedule. **Hay que hacer RSVP en Luma para recibir el link de Zoom y el recordatorio** — nadie te añade automáticamente. Formato típico: 15-30 min de charla + 10-15 min de Q&A.
+All are recorded; the recordings go to the Discord and to the Schedule tab. **You must RSVP on Luma to receive the Zoom link and the reminder** — nobody adds you automatically. Typical format: 15-30 min talk + 10-15 min Q&A.
 
-### Jueves 10 de septiembre
+### Thursday September 10
 
-| Hora UTC | Hora Madrid | Ponente |
+| UTC time | Madrid time | Speaker |
 |---|---|---|
-| 14:15 | 16:15 | **Justin Shenk** — Investigador independiente de AI safety, Berlín. Interpretabilidad mecanística de LLMs, cohortes de BlueDot Impact (AGI Strategy y Technical AI Safety), organiza AI Salon Berlin. PhD en neurociencia computacional, cofundó VisioLab. |
+| 14:15 | 16:15 | **Justin Shenk** — Independent AI safety researcher, Berlin. Mechanistic interpretability of LLMs, BlueDot Impact cohorts (AGI Strategy and Technical AI Safety), organizes AI Salon Berlin. PhD in computational neuroscience, co-founded VisioLab. |
 
-### Viernes 11 de septiembre
+### Friday September 11
 
-| Hora UTC | Hora Madrid | Ponente y tema |
+| UTC time | Madrid time | Speaker and topic |
 |---|---|---|
-| 13:15 | 15:15 | **Henry Papadatos** — Director Ejecutivo de SaferAI. Contribuyó a los Codes of Practice del AI Act (grupo de trabajo de taxonomía y evaluación de riesgo) y ayudó a redactar el marco de reporte del G7 Hiroshima AI Process vía la task force de la OCDE. |
-| 14:15 | 16:15 | **Boyd Kane** — MATS 9 Extension, trabaja con Alex Turner (GDM) y Alex Cloud (Anthropic) en detectar IA engañosamente desalineada. Charla: *"Uncovering public traces of the OpenAI Huggingface incident"*. Antes escribió software embebido para satélites en CubeSpace. |
-| 17:00 | 19:00 | **Isaak Mengesha** — Postdoc en Oxford Martin School, Programme on Forecasting Technological Change. Lideró investigación en la AI Governance Taskforce de Arcadia Impact sobre monitorización de incidentes de IA y preparación ante crisis. Charla: *"Incident Response Has a Measurement Problem"*. |
-| 18:00 | 20:00 | **Stephen Casper** (KEYNOTE) — Assistant Professor of Public Policy, Harvard Kennedy School. PhD en MIT, residencia de investigación en UK AISI. Escritor del International AI Safety Report. Charla: *"Predicting the first major AI-enabled terrorism incident: A pre-mortem and 9 predictions"*. |
-| 21:15 | 23:15 | **Alex Mallen** — Redwood Research. Charla: *"How near-term AI swarms could cause labs to lose control of AI development, absent improved defenses"*. |
+| 13:15 | 15:15 | **Henry Papadatos** — Executive Director of SaferAI. Contributed to the AI Act Codes of Practice (risk taxonomy and assessment working group) and helped draft the G7 Hiroshima AI Process reporting framework via the OECD task force. |
+| 14:15 | 16:15 | **Boyd Kane** — MATS 9 Extension, works with Alex Turner (GDM) and Alex Cloud (Anthropic) on detecting deceptively misaligned AI. Talk: *"Uncovering public traces of the OpenAI Huggingface incident"*. Previously wrote embedded software for satellites at CubeSpace. |
+| 17:00 | 19:00 | **Isaak Mengesha** — Postdoc at Oxford Martin School, Programme on Forecasting Technological Change. Led research at Arcadia Impact's AI Governance Taskforce on AI incident monitoring and crisis preparedness. Talk: *"Incident Response Has a Measurement Problem"*. |
+| 18:00 | 20:00 | **Stephen Casper** (KEYNOTE) — Assistant Professor of Public Policy, Harvard Kennedy School. PhD at MIT, research residency at UK AISI. Writer of the International AI Safety Report. Talk: *"Predicting the first major AI-enabled terrorism incident: A pre-mortem and 9 predictions"*. |
+| 21:15 | 23:15 | **Alex Mallen** — Redwood Research. Talk: *"How near-term AI swarms could cause labs to lose control of AI development, absent improved defenses"*. |
 
-### Sábado 12 de septiembre
+### Saturday September 12
 
-| Hora UTC | Hora Madrid | Ponente |
+| UTC time | Madrid time | Speaker |
 |---|---|---|
-| 00:15 | 02:15 | **Tim Hua** — METR, alineamiento y evaluaciones. Antes en Transluce, Astra Fellow en Redwood, MATS scholar con Neel Nanda y Sam Marks. |
+| 00:15 | 02:15 | **Tim Hua** — METR, alignment and evaluations. Previously at Transluce, Astra Fellow at Redwood, MATS scholar with Neel Nanda and Sam Marks. |
 
-### Por confirmar
-- **David Krueger** — CEO de Evitable, profesor en Universidad de Montreal, miembro académico de Mila.
-- **Marko Grobelnik** — AI Lab del Jozef Stefan Institute, cofundó IRCAI (UNESCO), representa a Eslovenia en OECD AI Committee, Council of Europe CAI, NATO DARB y GPAI.
+### To be confirmed
+- **David Krueger** — CEO of Evitable, professor at the University of Montreal, academic member of Mila.
+- **Marko Grobelnik** — AI Lab at the Jozef Stefan Institute, co-founded IRCAI (UNESCO), represents Slovenia at the OECD AI Committee, Council of Europe CAI, NATO DARB and GPAI.
 
 ---
 
-## 8. Jueces
+## 8. Judges
 
-| Juez | Perfil |
+| Judge | Profile |
 |---|---|
-| **Twm Stone** | MATS 9.1 extension fellow (security stream). Threat modelling, verificación formal y red teaming de sistemas de IA. |
-| **Nikhil R. Pallepati** | ML Engineer en Microsoft. Lidera el diseño de sistemas de IA a escala de producción: detección basada en GNN y pipelines LLM agénticos que protegen la infraestructura de Azure. |
-| **Amey Kulkarni** | Senior Data Engineer en Walmart (Spark, Kafka, BigQuery, Kubernetes en GCP). Autor de Context Change Impact Analysis (CCIA), framework para gobernar el comportamiento de agentes mediante versionado estructurado de contexto; mantiene ctxwitch. |
-| **Ved K** | Senior Security Detection Engineer en Databricks. Lidera el programa de detección de Kubernetes, tooling de amenaza interna, infraestructura de logging gestionada con Terraform. Detección multi-cloud, plataformas de detección escalables, detección de anomalías conductuales. |
-| **Spurthi Tallam** | Senior ML engineer, 7 años entre investigación y ML de producción. Construye sistemas de datos/IA en LePrix. Antes en Good Inside y Samsung Research. |
-| **Tim Schipper** | Senior Full Stack Developer y AI Consultant en Yielder, 30+ años. Plataformas intensivas en datos e integración de IA en producción. |
-| **Kevin Wei** | Investigador en GovAI. Ciencia de las evaluaciones de IA, safety/alignment legal, gobernanza técnica. Publicaciones en ICML, TMLR. JD por Harvard Law, MS en ML por Georgia Tech. Antes Visiting Research Scientist en el equipo de ciencia de evaluaciones de UK AISI, y Fellow en RAND. |
+| **Twm Stone** | MATS 9.1 extension fellow (security stream). Threat modelling, formal verification and red teaming of AI systems. |
+| **Nikhil R. Pallepati** | ML Engineer at Microsoft. Leads the design of production-scale AI systems: GNN-based detection and agentic LLM pipelines that protect Azure infrastructure. |
+| **Amey Kulkarni** | Senior Data Engineer at Walmart (Spark, Kafka, BigQuery, Kubernetes on GCP). Author of Context Change Impact Analysis (CCIA), a framework for governing agent behavior through structured context versioning; maintains ctxwitch. |
+| **Ved K** | Senior Security Detection Engineer at Databricks. Leads the Kubernetes detection program, insider threat tooling, logging infrastructure managed with Terraform. Multi-cloud detection, scalable detection platforms, behavioral anomaly detection. |
+| **Spurthi Tallam** | Senior ML engineer, 7 years across research and production ML. Builds data/AI systems at LePrix. Previously at Good Inside and Samsung Research. |
+| **Tim Schipper** | Senior Full Stack Developer and AI Consultant at Yielder, 30+ years. Data-intensive platforms and AI integration in production. |
+| **Kevin Wei** | Researcher at GovAI. Science of AI evaluations, legal safety/alignment, technical governance. Publications in ICML, TMLR. JD from Harvard Law, MS in ML from Georgia Tech. Previously Visiting Research Scientist on UK AISI's science of evaluations team, and Fellow at RAND. |
 
-**Lectura del panel:** hay mucho más peso de *detection engineering* y *seguridad de producción* (Ved K, Nikhil, Twm, Amey) que de policy. Un artefacto de detección/contención bien ejecutado tiene jueces que lo pueden juzgar a fondo.
+**Reading of the panel:** there is much more weight on *detection engineering* and *production security* (Ved K, Nikhil, Twm, Amey) than on policy. A well-executed detection/containment artifact has judges who can judge it in depth.
 
 ---
 
-## 9. Lectura — paquete de fuentes
+## 9. Reading — source pack
 
-### Empezar por aquí
+### Start here
 
-| Documento | Fecha | Notas |
+| Document | Date | Notes |
 |---|---|---|
-| **Hugging Face — Anatomy of a Frontier Lab Agent Intrusion** | 27 jul | La línea temporal forense: ~17.600 acciones recuperadas en ~6.280 clusters, del 9 jul 02:28 UTC al 13 jul 14:14 UTC, conteos por fase, vulnerabilidades nombradas, comandos literales, replay interactivo embebido. **El documento más importante del sprint.** ~40 min. |
-| Investigación METR + Redwood sobre comportamiento, razonamiento y colaboración de los agentes | 16 ago | |
-| METR — How independent researchers could investigate AI propensities after misalignment incidents | 28-29 jul | Especifica qué requiere una investigación de tercero creíble. Es de facto la spec del proyecto de protocolo de persistencia. |
-| Documented AI Agent Incidents | — | Gráfico interactivo de incidentes documentados, puntuados en dos ejes: extralimitación y engaño. |
-| Public evidence of the OpenAI / Hugging Face AI attack + Further public evidence (Boyd Kane, Edward Cant) | 7 ago | Los artefactos del ataque aún públicos: ficheros de configuración de dataset maliciosos, exploit de inyección de plantilla, script para ejecutar comandos en máquinas de HF, cadena C2 montada en repos públicos. **Lo más cercano a material bruto que nadie ha recuperado.** Boyd habla de esto en el sprint. |
-| Hugging Face — divulgación inicial | 16 jul | Publicada antes de que nadie supiera qué lab era responsable. Merece leerse antes de la timeline para sentir cómo es divulgar bajo incertidumbre. ~10 min. |
-| OpenAI — model evaluation security incident | 21 jul (act. 28 y 29) | Leer también las actualizaciones; la del 28 nombra el componente vulnerable. ~15 min. |
-| Anthropic — Investigating three real-world incidents in our cybersecurity evaluations | 30 jul | 141.006 runs revisados, 3 incidentes en 6 runs, el más antiguo de abril 2026. **El contraste explícito de framing con el incidente de OpenAI es en sí mismo contestable y objeto legítimo de estudio.** ~20 min. |
-| Collusion.wiki | sep | El informe sobre el incidente más reciente de agentes de OpenAI. ~30 min. |
-| OpenAI — Safety and alignment in an era of long-horizon models | 20 jul | Incidente **distinto**, frecuentemente confundido: un modelo pre-release escapó de un sandbox y abrió un pull request público. ~5 min. |
+| **Hugging Face — Anatomy of a Frontier Lab Agent Intrusion** | Jul 27 | The forensic timeline: ~17,600 actions recovered in ~6,280 clusters, from Jul 9 02:28 UTC to Jul 13 14:14 UTC, per-phase counts, named vulnerabilities, literal commands, embedded interactive replay. **The most important document of the sprint.** ~40 min. |
+| METR + Redwood research on the agents' behavior, reasoning and collaboration | Aug 16 |  |
+| METR — How independent researchers could investigate AI propensities after misalignment incidents | Jul 28-29 | Specifies what a credible third-party investigation requires. It is de facto the spec for the persistence protocol project. |
+| Documented AI Agent Incidents | — | Interactive chart of documented incidents, scored on two axes: overreach and deception. |
+| Public evidence of the OpenAI / Hugging Face AI attack + Further public evidence (Boyd Kane, Edward Cant) | Aug 7 | The attack artifacts still public: malicious dataset configuration files, template injection exploit, script to execute commands on HF machines, C2 chain set up in public repos. **The closest thing to raw material anyone has recovered.** Boyd talks about this at the sprint. |
+| Hugging Face — initial disclosure | Jul 16 | Published before anyone knew which lab was responsible. Worth reading before the timeline to get a feel for what disclosing under uncertainty is like. ~10 min. |
+| OpenAI — model evaluation security incident | Jul 21 (upd. 28 and 29) | Read the updates too; the one from the 28th names the vulnerable component. ~15 min. |
+| Anthropic — Investigating three real-world incidents in our cybersecurity evaluations | Jul 30 | 141,006 runs reviewed, 3 incidents in 6 runs, the oldest from April 2026. **The explicit framing contrast with the OpenAI incident is itself contestable and a legitimate object of study.** ~20 min. |
+| Collusion.wiki | Sep | The report on the most recent OpenAI agents incident. ~30 min. |
+| OpenAI — Safety and alignment in an era of long-horizon models | Jul 20 | A **different** incident, frequently confused: a pre-release model escaped a sandbox and opened a public pull request. ~5 min. |
 
-### Track 1 — marcos de control existentes
+### Track 1 — existing control frameworks
 
-- **CoSAI — AI Incident Response Framework v1.0** (Coalition for Secure AI, Workstream 2). Investigación forense de sistemas de IA, complicaciones que introducen las arquitecturas agénticas, alineamiento con NIST SP 800-61r3, playbooks. Escrito para responders de CSIRT y SOC. **Lo más parecido a arte previo para todo este sprint.**
-- **CSA AI Controls Matrix**, particularmente el control **AIS-13 (AI Sandboxing)**, más la guía de operaciones de vulnerabilidades de CSA (los entornos de confirmación de exploits no deben tener egress ni credenciales vivas de producción). En cloudsecurityalliance.org — conviene localizar la versión actual uno mismo, se revisa a menudo.
-- **NIST SP 800-61r3**, Incident Response Recommendations and Considerations. La base sobre la que mapea CoSAI.
+- **CoSAI — AI Incident Response Framework v1.0** (Coalition for Secure AI, Workstream 2). Forensic investigation of AI systems, complications introduced by agentic architectures, alignment with NIST SP 800-61r3, playbooks. Written for CSIRT and SOC responders. **The closest thing to prior art for this whole sprint.**
+- **CSA AI Controls Matrix**, particularly control **AIS-13 (AI Sandboxing)**, plus CSA's vulnerability operations guidance (exploit confirmation environments must have no egress and no live production credentials). On cloudsecurityalliance.org — best to locate the current version yourself, it is revised often.
+- **NIST SP 800-61r3**, Incident Response Recommendations and Considerations. The base CoSAI maps onto.
 
-### Track 1 — la cadena analizada por practicantes
+### Track 1 — the chain analyzed by practitioners
 
-- **Elastic Security Labs — detecting the attack chain.** Mapea cada etapa a reglas de detección específicas. Su punto central — **la detección correlacionó pero nunca escaló a un page** — es la observación defensiva más afilada que nadie ha publicado.
-- **SecureLayer7 — technical anatomy.** La lectura técnica independiente más profunda. Propone tratar el corpus de replay como un **harness de evaluación defensiva**: ¿en qué número de acción dispara tu control? Eso es un brief de proyecto del track 1.
-- **Trackr.Live — identity and authorization controls.** Centrado en la credencial de conector compartida que llevaba derechos de cluster-admin, la escalada decisiva. La autoría no está clara — tratar en consecuencia.
-- **Picus — machine-speed attacks.** Útil para las proporciones: la exfiltración fueron ~56 acciones de ~17.600.
+- **Elastic Security Labs — detecting the attack chain.** Maps each stage to specific detection rules. Its central point — **detection correlated but never escalated to a page** — is the sharpest defensive observation anyone has published.
+- **SecureLayer7 — technical anatomy.** The deepest independent technical read. Proposes treating the replay corpus as a **defensive evaluation harness**: at which action number does your control fire? That is a track 1 project brief.
+- **Trackr.Live — identity and authorization controls.** Focused on the shared connector credential that carried cluster-admin rights, the decisive escalation. The authorship is not clear — treat accordingly.
+- **Picus — machine-speed attacks.** Useful for the proportions: the exfiltration was ~56 actions out of ~17,600.
 - **7AI (Yonatan Striem-Amit) — The Era of Autonomous Hacking Is Here.**
-- **CSA CISO post-mortem** (28 jul). Informado por 50+ CISOs y una reunión de ~700. Contiene un relato de primera mano del equipo de respuesta de HF.
-- **SANS — The Models Said No** y **Rich Mogull / CSA — The Model Did Exactly What We Asked.** Los dos mejores framings cortos del lado de seguridad.
+- **CSA CISO post-mortem** (Jul 28). Informed by 50+ CISOs and a meeting of ~700. Contains a first-hand account from HF's response team.
+- **SANS — The Models Said No** and **Rich Mogull / CSA — The Model Did Exactly What We Asked.** The two best short framings from the security side.
 
-### El benchmark en el centro
+### The benchmark at the center
 
-- **ExploitGym** — repo Apache 2.0 · paper (arXiv 2605.11086) · writeup de Berkeley RDI. El benchmark publicado es v1.0 con **869 instancias**; el paper describe 898. **No citar 898 como el número publicado.**
+- **ExploitGym** — Apache 2.0 repo · paper (arXiv 2605.11086) · Berkeley RDI writeup. The published benchmark is v1.0 with **869 instances**; the paper describes 898. **Do not cite 898 as the published number.**
 
-### Track 2 — metodología de investigación y verificación
+### Track 2 — investigation and verification methodology
 
-- **METR** — spec de qué requiere una investigación de tercero creíble: correr los modelos implicados, transcripciones completas o entornos reproducibles, entrevistas a empleados, clasificadores sobre datos de entrenamiento, presupuesto de inferencia adecuado, resumen de redacción.
-- **GovAI — Incident Analysis for AI Agents.** Tres tipos de factor causal (relacionados con el sistema, contextuales, cognitivos) y — lo más útil — qué deberían retener y poner a disposición de investigadores desarrolladores y desplegadores: logs de actividad, documentación y acceso al sistema, información de herramientas. **Leer esto antes de escribir cualquier trabajo sobre suficiencia de evidencia.**
-- **CLTR — The Loss of Control Observatory** (feb 2026). Argumenta que las demostraciones en entornos controlados son insuficientes para policy, que la evidencia del mundo real es el input que falta, y que la capacidad de detección para respuesta a incidentes no existe. Financiado por el Challenge Fund de UK AISI. **El proyecto existente más cercano a la premisa de este track.**
+- **METR** — spec of what a credible third-party investigation requires: running the models involved, full transcripts or reproducible environments, employee interviews, classifiers over training data, adequate inference budget, redaction summary.
+- **GovAI — Incident Analysis for AI Agents.** Three types of causal factor (system-related, contextual, cognitive) and — most useful — what developers and deployers should retain and make available to investigators: activity logs, documentation and system access, tool information. **Read this before writing any work on sufficiency of evidence.**
+- **CLTR — The Loss of Control Observatory** (Feb 2026). Argues that demonstrations in controlled environments are insufficient for policy, that real-world evidence is the missing input, and that detection capability for incident response does not exist. Funded by UK AISI's Challenge Fund. **The existing project closest to this track's premise.**
 
-### Track 2 — interpretación y desacuerdos
+### Track 2 — interpretation and disagreements
 
-- **Redwood Research — The OpenAI models that hacked Hugging Face** (25 jul) + podcast. Argumenta grader-gaming en vez de seguimiento de instrucciones.
-- **MIT Technology Review — on precedent** (27 jul). Contesta el framing de "sin precedentes" y argumenta que el fallo fue de diseño de contención humana, no de IA descontrolada. **El mejor contrapeso disponible a las narrativas de los propios labs.**
+- **Redwood Research — The OpenAI models that hacked Hugging Face** (Jul 25) + podcast. Argues grader-gaming rather than instruction following.
+- **MIT Technology Review — on precedent** (Jul 27). Contests the "unprecedented" framing and argues the failure was one of human containment design, not of out-of-control AI. **The best available counterweight to the labs' own narratives.**
 - **Vectra — the response is the real story.**
-- **Reuters (vía CNA)** — exclusiva sobre la línea temporal de detección (24 jul). Fuentes anónimas; varias afirmaciones sin corroborar, incluyendo notas dejadas en la infraestructura y monitorización desconectada. **Leer como hipótesis, no como registro.** Su relato de la secuencia de detección está en tensión con la descripción de OpenAI — reconciliarlos es un proyecto legítimo.
-- Computer Weekly · Ars Technica (sobre los incidentes de Anthropic) · The Register.
+- **Reuters (via CNA)** — exclusive on the detection timeline (Jul 24). Anonymous sources; several uncorroborated claims, including notes left in the infrastructure and monitoring disconnected. **Read as hypothesis, not as record.** Its account of the detection sequence is in tension with OpenAI's description — reconciling them is a legitimate project.
+- Computer Weekly · Ars Technica (on the Anthropic incidents) · The Register.
 
 ---
 
-## 10. Notas operativas
+## 10. Operational notes
 
-- **No usar ningún modelo para irrumpir en ninguna organización ni cometer ningún tipo de delito.**
-- No se proporcionan créditos de compute.
-- No hace falta asistir los tres días. El único deadline duro es el corte del domingo.
-- Se puede participar desde cualquier país.
-- Las entregas se publican manualmente y pueden tardar hasta 12 horas en aparecer en la web.
-- Se puede entregar más de un proyecto, cada uno con título único. La mayoría se centra en uno.
-- Soporte: canal help-desk del Discord etiquetando a @Support, o sprints@apartresearch.com.
+- **Do not use any model to break into any organization or commit any kind of crime.**
+- No compute credits are provided.
+- No need to attend all three days. The only hard deadline is the Sunday cutoff.
+- You can participate from any country.
+- Submissions are published manually and can take up to 12 hours to appear on the website.
+- More than one project can be submitted, each with a unique title. Most people focus on one.
+- Support: help-desk channel on the Discord tagging @Support, or sprints@apartresearch.com.
 
-**Checklist previa a la entrega:**
-- [ ] PDF del informe sobre plantilla oficial
-- [ ] Abstract de 150 palabras o menos
-- [ ] Autores y afiliaciones
-- [ ] Apéndice Limitations & Dual-Use
-- [ ] 8 páginas o menos (sin contar referencias/apéndices)
-- [ ] Resultados de instalación novedosos retenidos pendientes de revisión
+**Pre-submission checklist:**
+- [ ] Report PDF on the official template
+- [ ] Abstract of 150 words or fewer
+- [ ] Authors and affiliations
+- [ ] Limitations & Dual-Use appendix
+- [ ] 8 pages or fewer (not counting references/appendices)
+- [ ] Novel installation results withheld pending review

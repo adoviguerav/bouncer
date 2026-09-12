@@ -1,4 +1,4 @@
-"""Pruebas de la preparación del dataset (fase 1) con revisiones pequeñas propias."""
+"""Tests for the dataset preparation (phase 1) with small revisions of our own."""
 
 import gzip
 import hashlib
@@ -14,12 +14,12 @@ REVISION_DEFAULTS = {
     "time_grade": "reqlog",
     "uncertainty_seconds": 1,
     "seq": 1,
-    "body": "texto",
+    "body": "text",
     "request_action": "form_edit",
     "related_event_id": None,
 }
 
-# Nombre, hora, página y cuerpo elegidos para cubrir cada caso del plan.
+# Name, time, page and body chosen to cover each case of the plan.
 REVISIONS = [
     {"rev_id": "w~Z@1", "label": "AgentC", "time": "2026-06-01T09:00:00Z", "page_key": "w~Z"},
     {"rev_id": "w~B@1", "label": "AgentA", "time": "2026-06-01T09:00:00Z", "page_key": "w~B"},
@@ -31,7 +31,7 @@ REVISIONS = [
     {"rev_id": "w~T@1", "label": "AgentB", "time": "not-a-date", "page_key": "w~T"},
     {"rev_id": "w~M@1", "label": "AgentB", "time": "2026-06-01T10:03:00Z", "page_key": None},
     {"rev_id": "w~R@1", "label": "AgentB", "time": "2026-06-01T10:04:00Z", "page_key": "w~R", "request_action": ""},
-    # Tres motivos a la vez: cuenta una sola vez, por el primero del orden.
+    # Three reasons at once: counts only once, by the first in the order.
     {"rev_id": "w~X@1", "label": "[Admin1]", "time": "not-a-date", "page_key": None},
 ]
 
@@ -125,7 +125,7 @@ def test_source_ref_requires_one_record_per_line(corpus: Path, tmp_path: Path) -
     with gzip.open(path, "wt", encoding="utf-8") as fh:
         fh.write(first + "\n\n" + rest)
 
-    with pytest.raises(ValueError, match="líneas"):
+    with pytest.raises(ValueError, match="lines"):
         prepare.prepare(corpus, tmp_path / "out")
 
 
@@ -134,7 +134,7 @@ def test_recoverable_rows_are_not_silently_dropped(corpus: Path, tmp_path: Path)
     rows.append(REVISION_DEFAULTS | {"rev_id": "w~A@1", "label": "", "time": "2026-06-01T11:00:00Z", "page_key": "w~A", "related_event_id": "save:w~A@1"})
     write_jsonl_gz(corpus / "revisions.jsonl.gz", rows)
 
-    with pytest.raises(ValueError, match="recuperación no implementada"):
+    with pytest.raises(ValueError, match="recovery not implemented"):
         prepare.prepare(corpus, tmp_path / "out")
 
 
@@ -150,7 +150,7 @@ def test_missing_identity(prepared: Path) -> None:
 def test_missing_request_action(prepared: Path) -> None:
     events = {e["rev_id"]: e for e in read_events(prepared)}
 
-    for rev_id in ("w~Q@1", "w~R@1"):  # null y cadena vacía en el original
+    for rev_id in ("w~Q@1", "w~R@1"):  # null and empty string in the original
         assert events[rev_id]["request_action"] is None
         assert events[rev_id]["provenance"]["request_action"] == "unknown"
     assert events["w~P@1"]["request_action"] == "form_edit"

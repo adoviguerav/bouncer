@@ -1,7 +1,7 @@
 [project]
 name = "bouncer"
 version = "0.1.0"
-description = "Portero de llamadas a herramienta: comprueba cada llamada de un agente antes de ejecutarla y registra quién hizo qué"
+description = "Tool-call gatekeeper: checks each agent call before executing it and records who did what"
 requires-python = ">=3.11"
 dependencies = [
     "pandas>=2.2",

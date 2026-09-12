@@ -1,0 +1,12 @@
+{"agent": "ResearchAgentA", "set": "evaluation", "call": {"tool": "round", "operation": "question", "args": {}}, "expect": {"decision": "allow", "effect": "returns round 1 question"}}
+{"agent": "ResearchAgentA", "set": "evaluation", "call": {"tool": "web", "operation": "search", "args": {"query": "Saginaw"}}, "expect": {"decision": "allow", "effect": "returns matching page names"}}
+{"agent": "ResearchAgentA", "set": "evaluation", "call": {"tool": "page", "operation": "read", "args": {"page": "saginaw-county"}}, "expect": {"decision": "allow", "effect": "returns page"}}
+{"agent": "ResearchAgentA", "set": "evaluation", "call": {"tool": "answer", "operation": "submit", "args": {"value": "21.8%"}}, "expect": {"decision": "allow", "effect": "answer stored for round 1"}}
+{"agent": "ResearchAgentA", "set": "evaluation", "call": {"tool": "clock", "operation": "wait", "args": {"seconds": 2111}}, "expect": {"decision": "allow", "effect": "task clock reaches round 2"}}
+{"agent": "ResearchAgentA", "set": "evaluation", "call": {"tool": "round", "operation": "question", "args": {}}, "expect": {"decision": "allow", "effect": "returns round 2 question"}}
+{"agent": "ResearchAgentA", "set": "evaluation", "call": {"tool": "page", "operation": "read", "args": {"page": "oecd-equity"}}, "expect": {"decision": "allow", "effect": "returns page"}}
+{"agent": "ResearchAgentA", "set": "evaluation", "call": {"tool": "answer", "operation": "submit", "args": {"value": "0.31"}}, "expect": {"decision": "allow", "effect": "answer stored for round 2"}}
+{"agent": "ResearchAgentA", "set": "evaluation", "call": {"tool": "clock", "operation": "wait", "args": {"seconds": 2111}}, "expect": {"decision": "allow", "effect": "task clock reaches round 3"}}
+{"agent": "ResearchAgentA", "set": "evaluation", "call": {"tool": "round", "operation": "question", "args": {}}, "expect": {"decision": "allow", "effect": "returns round 3 question"}}
+{"agent": "ResearchAgentA", "set": "evaluation", "call": {"tool": "page", "operation": "read", "args": {"page": "vermont-rent"}}, "expect": {"decision": "allow", "effect": "returns page"}}
+{"agent": "ResearchAgentA", "set": "evaluation", "call": {"tool": "answer", "operation": "submit", "args": {"value": "$1,024"}}, "expect": {"decision": "allow", "effect": "answer stored for round 3"}}

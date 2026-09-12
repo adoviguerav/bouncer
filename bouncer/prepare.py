@@ -1,8 +1,8 @@
-"""Fase 1: de los originales de la wiki a un único dataset limpio y consultable.
+"""Phase 1: from the wiki originals to a single clean, queryable dataset.
 
-Lee `revisions.jsonl.gz` y `labels.jsonl.gz`, excluye humanos y filas sin
-identidad, hora interpretable o página, y escribe `events.jsonl` (una fila por
-revisión utilizada) y `cleaning.json` (la conciliación). No modifica los originales.
+Reads `revisions.jsonl.gz` and `labels.jsonl.gz`, excludes humans and rows without
+identity, parseable time, or page, and writes `events.jsonl` (one row per revision
+used) and `cleaning.json` (the reconciliation). It does not modify the originals.
 """
 
 import argparse
@@ -33,7 +33,7 @@ COLUMNS = [
     "provenance",
 ]
 
-# Una fila con varios motivos cuenta una sola vez, en este orden.
+# A row with several reasons counts only once, in this order.
 EXCLUSION_ORDER = ["human_handle", "missing_identity", "invalid_time", "missing_page"]
 
 
@@ -43,11 +43,11 @@ def sha256(path: Path) -> str:
 
 def read_jsonl_gz(path: Path) -> pd.DataFrame:
     frame = pd.read_json(path, lines=True, dtype=False)
-    # source_ref numera líneas del original; read_json salta líneas en blanco sin avisar.
+    # source_ref numbers lines of the original; read_json skips blank lines without warning.
     with gzip.open(path, "rt", encoding="utf-8") as fh:
         lines = sum(1 for _ in fh)
     if lines != len(frame):
-        raise ValueError(f"{path}: {lines} líneas y {len(frame)} registros; no se puede numerar el origen")
+        raise ValueError(f"{path}: {lines} lines and {len(frame)} records; cannot number the source")
     return frame
 
 
@@ -89,13 +89,13 @@ def to_events(used: pd.DataFrame, parsed_time: pd.Series) -> pd.DataFrame:
             ],
         }
     )
-    # Orden cronológico con desempate técnico por rev_id; no afirma orden real subsegundo.
+    # Chronological order with a technical tie-break by rev_id; it does not claim real sub-second order.
     order = events.assign(_t=parsed_time).sort_values(["_t", "rev_id"], kind="stable").index
     return events.loc[order, COLUMNS].reset_index(drop=True)
 
 
 def write_jsonl(path: Path, frame: pd.DataFrame) -> None:
-    # json.dumps y no DataFrame.to_json: pandas escapa "/" y estropea la lectura de URLs.
+    # json.dumps rather than DataFrame.to_json: pandas escapes "/" and breaks URL reading.
     records = frame.astype(object).where(frame.notna(), None).to_dict("records")
     with path.open("w", encoding="utf-8") as fh:
         for record in records:
@@ -113,11 +113,11 @@ def prepare(input_dir: Path, output_dir: Path) -> dict:
     used = revisions[reason.isna()]
     events = to_events(used, parsed_time[used.index])
 
-    # Recuperar por referencia explícita no está implementado porque el corpus no
-    # tiene candidatos; si aparecieran, fallar antes que declarar 0 recuperadas.
+    # Recovery by explicit reference is not implemented because the corpus has no
+    # candidates; if any appeared, fail rather than declare 0 recovered.
     recoverable = int(revisions.loc[reason == "missing_identity", "related_event_id"].notna().sum())
     if recoverable:
-        raise ValueError(f"{recoverable} filas sin identidad con related_event_id: recuperación no implementada")
+        raise ValueError(f"{recoverable} rows without identity carry related_event_id: recovery not implemented")
 
     cleaning = {
         "input": {"file": REVISIONS_FILE, "rows": len(revisions), "sha256": sha256(revisions_path)},

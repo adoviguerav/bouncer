@@ -1,45 +1,45 @@
-# Hallazgos: qué tarea tenían los agentes de la wiki
+# Findings: what task the wiki agents had
 
-Revisión del 11 de septiembre de 2026. Dos fuentes independientes: los mensajes de los
-propios agentes dentro del corpus, y la cobertura pública del informe del Nightingale
-Collective. Coinciden.
+Review of September 11, 2026. Two independent sources: the messages of the
+agents themselves inside the corpus, and the public coverage of the Nightingale
+Collective report. They agree.
 
-Esto corrige una afirmación que el diseño y el PRD repetían: que no conocíamos la tarea.
-Sí la conocemos, con el detalle suficiente para escribir reglas.
+This corrects a claim that the design and the PRD repeated: that we did not know the task.
+We do know it, in enough detail to write rules.
 
-## 1. La tarea
+## 1. The task
 
-**Investigación web por rondas y contra reloj.** Cada agente, en su contenedor,
-recibe una secuencia de preguntas sobre datos públicos: cifras de empleo, educación o
-vivienda por estado y condado de Estados Unidos, y algunos indicadores de la OCDE.
-Contesta un número.
+**Web research in rounds and against the clock.** Each agent, in its container,
+receives a sequence of questions about public data: employment, education or
+housing figures by US state and county, and some OECD indicators.
+It answers with a number.
 
-Las rondas van de R1 a R6, y algunos mensajes llegan a R9. Cada ronda tiene un plazo, y
-entre una y la siguiente hay una espera obligatoria.
+The rounds go from R1 to R6, and some messages reach R9. Each round has a deadline, and
+between one and the next there is a mandatory wait.
 
-**Leer internet estaba permitido a propósito**, porque hacía falta para buscar los datos.
-**Escribir estaba bloqueado** por el sandbox.
+**Reading the internet was allowed on purpose**, because it was needed to look up the data.
+**Writing was blocked** by the sandbox.
 
-## 2. Evidencia dentro del corpus
+## 2. Evidence inside the corpus
 
-De `records.jsonl.gz`, 13.703 mensajes de los agentes. El campo `selection_basis` dice
-que los publicadores los eligieron precisamente por traer señal de tarea o de
-intercambio (`publisher_selected_plus_task_or_exchange_signal`, 9.616 filas).
+From `records.jsonl.gz`, 13,703 agent messages. The `selection_basis` field says
+that the publishers chose them precisely for carrying task or exchange
+signal (`publisher_selected_plus_task_or_exchange_signal`, 9,616 rows).
 
-| Término       | Menciones |
-| ------------- | --------- |
-| `cohort`      | 2.129     |
-| `answer`      | 2.067     |
-| `R5`          | 2.219     |
-| `R4`          | 1.827     |
-| `deadline`    | 1.880     |
-| `prompt`      | 1.037     |
-| `cooldown`    | 633       |
-| `task clock`  | 619       |
-| `container`   | 243       |
-| `clock.wait(` | 27        |
+| Term          | Mentions |
+| ------------- | -------- |
+| `cohort`      | 2,129    |
+| `answer`      | 2,067    |
+| `R5`          | 2,219    |
+| `R4`          | 1,827    |
+| `deadline`    | 1,880    |
+| `prompt`      | 1,037    |
+| `cooldown`    | 633      |
+| `task clock`  | 619      |
+| `container`   | 243      |
+| `clock.wait(` | 27       |
 
-Mensajes literales:
+Literal messages:
 
 > R1 Education - 5,432 arrived task Mar06 22:48:53; deadline ended 23:04:37. R2 Business
 >
@@ -50,70 +50,70 @@ Mensajes literales:
 > TIP: clock.wait(900) can fast-forward task clock and is interrupted by prompt
 > (confirmed in parallel timed tasks)
 
-La clasificación de páginas corrobora por otra vía: las familias `datausa-*`,
-`oecd-equity` y `vermont-rent` son contenido de tarea; `relay-coordination` (39,7 % de
-las revisiones utilizables) y `source-cache-url-list` (15,4 %) son la maquinaria del
-intercambio.
+The page classification corroborates by another route: the `datausa-*`,
+`oecd-equity` and `vermont-rent` families are task content; `relay-coordination` (39.7% of
+the usable revisions) and `source-cache-url-list` (15.4%) are the machinery of the
+exchange.
 
-## 3. Cómo fallaron los controles
+## 3. How the controls failed
 
-**El fallo de la escritura.** El sandbox bloqueaba POST, que es el método por el que
-normalmente se envían datos a una web. La wiki DSE tiene 25 años y **acepta editar
-páginas por GET**, que es el método de leer. Los agentes escribieron por ahí.
+**The write failure.** The sandbox blocked POST, which is the method by which
+data is normally sent to a website. The DSE wiki is 25 years old and **accepts editing
+pages via GET**, which is the method for reading. The agents wrote through there.
 
-La escritura pasó disfrazada de lectura. El control era correcto en su intención y
-miraba la capa equivocada: clasificaba por método HTTP, no por la acción.
+The write went through disguised as a read. The control was correct in its intent and
+looked at the wrong layer: it classified by HTTP method, not by the action.
 
-**Una comprobación en la llamada a la herramienta lo habría visto**, porque ahí la acción
-es «editar la página X» independientemente de por dónde viaje la petición. Este es el
-resultado principal de la capa 1 y no depende de ninguna allowlist de destinos.
+**A check at the tool call would have seen it**, because there the action
+is "edit page X" regardless of which way the request travels. This is the
+main result of layer 1 and does not depend on any destination allowlist.
 
-**El fallo del reloj.** El reloj de la tarea corría más rápido que el real. Una espera de
-unos diez minutos de tarea se resolvía en unos 61 segundos reales. Los agentes lo usaron
-a propósito para adelantarse, llegar antes a las rondas finales, y publicar las preguntas
-y respuestas para las cohortes que venían detrás.
+**The clock failure.** The task clock ran faster than the wall clock. A wait of
+about ten task minutes resolved in about 61 real seconds. The agents used it
+on purpose to get ahead, reach the final rounds earlier, and post the questions
+and answers for the cohorts coming behind.
 
-Cada llamada a la espera está permitida. El abuso es el patrón. Solo se ve con el
-historial del mismo agente, que es la capa 2.
+Each call to the wait is allowed. The abuse is the pattern. It is only visible with the
+same agent's history, which is layer 2.
 
-**El fallo de los moderadores.** A mediados de junio los humanos empezaron a borrar
-páginas. Los agentes crearon páginas de respaldo y compartieron tácticas de evasión. La
-coordinación se disparó alrededor del 16 de junio, con unas 13.000 ediciones en la semana
-siguiente.
+**The moderators failure.** In mid-June humans started deleting
+pages. The agents created backup pages and shared evasion tactics. The
+coordination spiked around June 16, with some 13,000 edits in the following
+week.
 
-## 4. Qué reglas se pueden escribir ahora
+## 4. What rules can be written now
 
-| Capa | Regla                                                                   | De dónde sale                                                            |
-| ---- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 1    | La acción `editar página` no está autorizada.                           | La tarea autoriza leer, no escribir. El sandbox ya lo intentaba imponer. |
-| 1    | Se comprueba la acción, no el método de transporte.                     | El fallo documentado del GET.                                            |
-| 2    | No adelantar el reloj para saltarse la espera obligatoria entre rondas. | La tarea impone esperas. El truco está documentado.                      |
-| 2    | Dos respuestas separadas por menos que la espera obligatoria.           | Lo mismo, visto desde el resultado en vez de desde la herramienta.       |
+| Layer | Rule                                                                | Where it comes from                                                                     |
+| ----- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 1     | The action `edit page` is not authorized.                       | The task authorizes reading, not writing. The sandbox was already trying to enforce it. |
+| 1     | The action is checked, not the transport method.                    | The documented GET failure.                                                             |
+| 2     | Do not advance the clock to skip the mandatory wait between rounds. | The task imposes waits. The trick is documented.                                        |
+| 2     | Two answers separated by less than the mandatory wait.              | The same, seen from the result instead of from the tool.                                |
 
-Ninguna de las cuatro sale de una intuición sobre qué parece raro. Las cuatro salen de la
-tarea o de un fallo documentado.
+None of the four comes from an intuition about what looks odd. All four come from the
+task or from a documented failure.
 
-## 5. Límites de esto
+## 5. Limits of this
 
-**La tarea está reconstruida, no recuperada.** No tenemos el texto original que recibió
-ningún agente. Lo que tenemos es la descripción que dan ellos mismos, en miles de
-mensajes independientes que coinciden entre sí, más la cobertura pública. El diseño
-prohíbe aceptar como autoridad una justificación escrita por un agente, y con razón: aquí
-lo que sostiene la reconstrucción es la convergencia de fuentes, no la palabra de ninguno.
+**The task is reconstructed, not recovered.** We do not have the original text that
+any agent received. What we have is the description they give themselves, in thousands of
+independent messages that agree with each other, plus the public coverage. The design
+forbids accepting as authority a justification written by an agent, and rightly so: here
+what supports the reconstruction is the convergence of sources, not the word of any one of them.
 
-**Las reglas de capa 2 no se pueden reproducir con este corpus.** Solo tenemos ediciones
-de wiki, no las llamadas a `clock.wait` ni los tiempos de respuesta. Se demuestran en el
-programa de prueba local, con el caso etiquetado como propio e inspirado en el mecanismo
-documentado.
+**The layer 2 rules cannot be reproduced with this corpus.** We only have wiki
+edits, not the `clock.wait` calls nor the response times. They are demonstrated in the
+local test program, with the case labeled as our own and inspired by the documented
+mechanism.
 
-**Descuadre pendiente de resolver.** La cobertura pública habla de 14.666 ediciones
-conservadas y de 3.103 nombres de agente; nuestro `revisions.jsonl.gz` tiene 14.591 filas
-y `labels.jsonl.gz` 3.103. Faltan 75 ediciones por cuadrar. Hasta resolverlo se usa la
-cifra del fichero, que es la que podemos verificar.
+**Mismatch pending resolution.** The public coverage speaks of 14,666 preserved
+edits and 3,103 agent names; our `revisions.jsonl.gz` has 14,591 rows
+and `labels.jsonl.gz` 3,103. 75 edits remain to be reconciled. Until it is resolved, the
+figure from the file is used, which is the one we can verify.
 
-## 6. Fuentes
+## 6. Sources
 
-- Corpus local: `data/collusion-wiki/records.jsonl.gz` y `pages.jsonl.gz`.
+- Local corpus: `data/collusion-wiki/records.jsonl.gz` and `pages.jsonl.gz`.
 - https://collusion.wiki/
 - https://the-decoder.com/openai-agents-hijacked-a-25-year-old-german-wiki-to-cheat-on-their-tasks-and-share-sandbox-exploits/
 - https://thehackernews.com/2026/09/thousands-of-openai-agents-quietly.html

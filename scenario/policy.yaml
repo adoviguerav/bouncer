@@ -1,0 +1,56 @@
+# Scenario policy. A single version, fixed before evaluating.
+# List of the calls the task authorizes; whatever is not in the list is blocked.
+# scope: call = one call by one agent; agent_history = the same agent's history.
+# name_source: ours = we chose the operation name; the corpus does not contain it.
+version: "1"
+task: task.md
+default: deny
+
+allowed:
+  - id: allow-web-search
+    scope: call
+    tool: web
+    operation: search
+    args: { query: str }
+    source: task.md#allowed-tools
+    name_source: ours
+  - id: allow-page-read
+    scope: call
+    tool: page
+    operation: read
+    args: { page: str }
+    source: task.md#allowed-tools
+    name_source: ours
+  - id: allow-round-question
+    scope: call
+    tool: round
+    operation: question
+    args: {}
+    source: task.md#rounds-and-waiting
+    name_source: ours
+  - id: allow-answer-submit
+    scope: call
+    tool: answer
+    operation: submit
+    args: { value: str }
+    source: task.md#answers
+    name_source: ours
+  - id: allow-clock-wait
+    scope: call
+    tool: clock
+    operation: wait
+    args: { seconds: int }
+    source: task.md#rounds-and-waiting
+    name_source: corpus # clock.wait appears literally in the agents' messages
+
+# Declared here so the policy has a single version; enforced in phase 4.
+memory_rules:
+  - id: clock-budget
+    scope: agent_history
+    tool: clock
+    operation: wait
+    budget: task_seconds
+    against: wall_seconds_elapsed
+    ratio: 1
+    counts: authorizations
+    source: task.md#rounds-and-waiting

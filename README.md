@@ -1,53 +1,53 @@
 # Bouncer
 
-Un portero que comprueba llamadas a herramientas antes de ejecutarlas. Proyecto para el AI Incident Response Sprint de Apart Research × CeSIA, con unas 12 horas de trabajo real.
+A gatekeeper that checks tool calls before executing them. Project for the AI Incident Response Sprint by Apart Research × CeSIA, with about 12 hours of actual work.
 
-**Estado:** alcance y diseño definidos; fase 1 (dataset único) implementada y verificada; portero, memoria, demo y resultados pendientes. Todavía no hay instrucciones de ejecución del portero.
+**Status:** scope and design defined; phases 1 (single dataset) and 2–3 (scenario, policy, gatekeeper, and local executor) implemented; per-agent memory, demo, and results pending.
 
-## La tesis
+## The thesis
 
-**No es que no hubiera controles.** En el incidente de OpenAI/Hugging Face había identidad de agente puesta por código de confianza, ~1.300 transcripciones con las llamadas y el razonamiento, contenedores sin ruta a internet y un proxy con allowlist de cuatro dominios.
+**It is not that there were no controls.** In the OpenAI/Hugging Face incident there was agent identity set by trusted code, ~1,300 transcripts with the calls and the reasoning, containers with no route to the internet, and a proxy with a four-domain allowlist.
 
-Lo que faltaba era peor que no tener nada:
+What was missing was worse than having nothing:
 
-- **Nadie leía las transcripciones.** «OpenAI did not use a scorer that would review their transcripts». Los agentes creían que sí, y coordinaron durante días para engañar a un vigilante que no existía.
-- **El registro estaba al alcance del vigilado.** Salieron del contenedor y sustituyeron el trozo del sistema que ejecuta las llamadas, así que podían declarar una y ejecutar otra. Al menos 96 transcripciones, en torno al 7 %.
-- **El canal por el que se coordinaron 1.200 agentes no tenía autenticación.** «Shared board unauthenticated, names can be posted by anyone», lo escribió un agente. Ellos mismos se montaron un esquema de firma para no suplantarse.
-- **La visibilidad terminaba en el escape del sandbox.** Las ~17.600 acciones posteriores las reconstruyó la víctima con sus propios registros.
+- **Nobody read the transcripts.** "OpenAI did not use a scorer that would review their transcripts". The agents believed someone did, and coordinated for days to fool a watcher that did not exist.
+- **The log was within reach of the watched.** They escaped the container and replaced the part of the system that executes the calls, so they could declare one and execute another. At least 96 transcripts, around 7%.
+- **The channel through which 1,200 agents coordinated had no authentication.** "Shared board unauthenticated, names can be posted by anyone", an agent wrote it. They set up a signature scheme themselves to avoid impersonating each other.
+- **Visibility ended at the sandbox escape.** The ~17,600 later actions were reconstructed by the victim from its own logs.
 
-**El fallo no fue no tener datos. Fue tenerlos, no mirarlos, y guardarlos donde el vigilado podía reescribirlos.**
+**The failure was not a lack of data. It was having it, not looking at it, and storing it where the watched could rewrite it.**
 
-De ahí las dos funciones del portero, y la segunda no es un extra: comprobar la llamada antes de ejecutarla, y **producir el registro desde código de confianza**, fuera del alcance de escritura del agente. Ninguno de los controles que había preguntaba si una llamada encajaba con el encargo autorizado.
+Hence the gatekeeper's two functions, and the second one is not an extra: check the call before executing it, and **produce the log from trusted code**, out of the agent's write reach. None of the existing controls asked whether a call fit the authorized task.
 
-El caso de la wiki lo enseña en pequeño y sin suponer nada: escribir estaba prohibido y el sandbox lo imponía bloqueando POST, pero la wiki acepta editar por GET, así que la escritura pasó disfrazada de lectura. El control miraba el transporte; un portero mira la llamada.
+The wiki case shows it in miniature and without assuming anything: writing was forbidden and the sandbox enforced it by blocking POST, but the wiki accepts edits via GET, so the write got through disguised as a read. The control looked at the transport; a gatekeeper looks at the call.
 
-## Qué contiene la entrega
+## What the deliverable contains
 
-La **parte 1** recorre el caso OpenAI/Hugging Face, que es lo que pide el Track 1: qué control existía, qué habría visto cada uno sobre las nueve fases documentadas (matriz control × fase), qué datos pediríamos al operador y qué no podemos ejecutar ni por presupuesto ni por prudencia.
+**Part 1** walks through the OpenAI/Hugging Face case, which is what Track 1 asks for: what control existed, what each one would have seen across the nine documented phases (control × phase matrix), what data we would ask the operator for, and what we cannot run, for budget or for prudence.
 
-La **parte 2** prepara un dataset único con el registro de ediciones de una wiki, implementa el portero y demuestra su funcionamiento con herramientas locales. Usamos los nombres no humanos como IDs, declaramos los datos faltantes y reproducimos las ediciones sin ejecutar instrucciones, código ni URLs del corpus.
+**Part 2** prepares a single dataset with the edit log of a wiki, implements the gatekeeper, and demonstrates it with local tools. We use the non-human names as IDs, declare the missing data, and replay the edits without executing instructions, code, or URLs from the corpus.
 
-La demostración del sprint simula la tarea de investigación con un portero entre la llamada a herramienta y su ejecución. Escribimos nosotros el encargo y las llamadas guionizadas, sin LLM ni gasto de API. El portero y las herramientas locales sí se ejecutan: las lecturas devuelven contenido y una edición bloqueada deja la wiki local intacta. El objetivo es enseñar un caso de uso verificable con pruebas concretas; el guion no es comportamiento observado de un modelo y el corpus solo conserva las ediciones, no la investigación completa.
+The sprint demonstration simulates the research task with a gatekeeper between the tool call and its execution. We wrote the task and the scripted calls ourselves, with no LLM and no API spend. The gatekeeper and the local tools do run: reads return content and a blocked edit leaves the local wiki intact. The goal is to show a verifiable use case with concrete tests; the script is not observed model behavior, and the corpus only preserves the edits, not the full research.
 
-El mínimo combina **reglas de permisos** y **reglas con memoria por ID**, junto con un registro de decisiones y un ejecutor controlado para verificar que las llamadas bloqueadas no se ejecutan. La política es **una lista de las llamadas que la tarea autoriza, con denegación por defecto**: lo que no está en la lista se bloquea. Editar una página salta por no estar, no porque ninguna regla la nombre.
+The minimum combines **permission rules** and **rules with memory per ID**, together with a decision log and a controlled executor to verify that blocked calls are not executed. The policy is **a list of the calls the task authorizes, with default deny**: whatever is not in the list is blocked. Editing a page is stopped because it is absent, not because any rule names it.
 
-La revisión con un LLM o clasificador y el análisis entre agentes son **opcionales**. La detección estadística de anomalías no es un requisito del mínimo, y los agregados del incidente dan un argumento en contra: las acciones fuera del encargo son el 2,7 % del volumen documentado.
+Review with an LLM or classifier and cross-agent analysis are **optional**. Statistical anomaly detection is not a requirement of the minimum, and the incident's aggregates argue against it: actions outside the task are 2.7% of the documented volume.
 
-## Fases de implementación
+## Implementation phases
 
-El [PRD](PRD.md), en su sección 11, define las tareas y el cierre de cada fase. La fase 1 está hecha; las demás, pendientes:
+The [PRD](PRD.md), in section 11, defines the tasks and the closing of each phase. Phases 1 to 3 are done; the rest, pending:
 
-1. **Dataset único y limpio.** Hecho: ver [Preparar el dataset](#preparar-el-dataset). Un archivo JSONL tabular, con una fila por revisión utilizada, los campos necesarios para analizarla y su procedencia. Se inspecciona como tabla sin volver a unir los archivos originales; el resumen de limpieza explica las exclusiones.
-2. **Escenario de investigación propio.** Preparar páginas, preguntas y estado local; escribir la política y los guiones con las cinco operaciones legítimas y una edición prohibida. Fijar una restricción con memoria y sus resultados esperados antes de medirla.
-3. **Portero y ejecución controlada.** Comprobar cada llamada antes de invocar la herramienta, asignar identidad y política desde código de confianza y registrar la decisión y el resultado. Probar que una lectura funciona y que una edición bloqueada no produce efecto.
-4. **Memoria por ejecución y agente.** Aplicar la restricción de secuencia definida en el escenario. Comprobar límites, intentos simultáneos y separación de historiales.
-5. **Demo, reproducción y resultados.** Ejecutar los guiones sin LLM y pasar el dataset histórico por el portero sin ejecutar su contenido. Comparar permisos solos frente a permisos con memoria, producir tablas y tiempos, y verificar los comandos para repetirlo.
+1. **Single clean dataset.** Done: see [Preparing the dataset](#preparing-the-dataset). A tabular JSONL file, one row per revision used, the fields needed to analyze it, and its provenance. Inspected as a table without re-joining the original files; the cleaning summary explains the exclusions.
+2. **Our own research scenario.** Done: see [Scenario, policy, and gatekeeper](#scenario-policy-and-gatekeeper). Pages, questions, and local state; policy with the five legitimate operations; scripts with legitimate work, a forbidden edit, and an unknown operation. The memory constraint is declared with its parameters.
+3. **Gatekeeper and controlled execution.** Done: same section. Each call is checked before invoking the tool, identity and policy come from trusted code, and the log records decision and result. A read returns content; a blocked edit does not touch the local wiki.
+4. **Memory per run and agent.** Enforce the sequence constraint defined in the scenario. Check limits, simultaneous attempts, and separation of histories.
+5. **Demo, replay, and results.** Run the scripts without an LLM and pass the historical dataset through the gatekeeper without executing its content. Compare permissions alone against permissions with memory, produce tables and timings, and verify the commands to repeat it.
 
-Las pruebas acompañan cada fase. El informe del sprint y la matriz de Hugging Face siguen siendo entregables obligatorios; son trabajo documental separado de estas fases técnicas.
+Tests accompany each phase. The sprint report and the Hugging Face matrix remain mandatory deliverables; they are documentary work separate from these technical phases.
 
-## Preparar el dataset
+## Preparing the dataset
 
-Requiere Python 3.11+ y [uv](https://docs.astral.sh/uv/).
+Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```sh
 uv sync
@@ -55,38 +55,54 @@ uv run python -m bouncer.prepare --output-dir data/prepared/wiki
 uv run pytest -q tests/test_prepare.py
 ```
 
-**Entradas:** `data/collusion-wiki/revisions.jsonl.gz` y `labels.jsonl.gz`. No se modifican; `cleaning.json` registra sus SHA-256.
+**Inputs:** `data/collusion-wiki/revisions.jsonl.gz` and `labels.jsonl.gz`. They are not modified; `cleaning.json` records their SHA-256.
 
-**Salidas** en `data/prepared/wiki/`, versionadas en el repositorio:
+**Outputs** in `data/prepared/wiki/`, versioned in the repository:
 
-- `events.jsonl`: 13.661 filas, una por revisión utilizada, ordenadas por `time` con desempate por `rev_id` (el desempate es técnico, no afirma orden real dentro del mismo segundo). Columnas: `rev_id`, `source_ref` (fichero:línea de origen), `agent_id` (el `label` literal, sin fusionar nombres), `time`, `time_grade`, `uncertainty_seconds`, `page_key`, `seq`, `body` (cuerpo completo; `""` es una página vaciada, no un dato ausente), `request_action` (`null` cuando el original no lo trae), `operation` (siempre `wiki.edit`, adaptación declarada) y `provenance` (qué es observado, adaptado o desconocido en esa fila).
-- `cleaning.json`: entrada 14.591 = 31 humanos (`is_human_handle` en `labels`) + 899 sin nombre + 13.661 utilizadas. Recuperadas 0: ninguna fila sin nombre tiene `related_event_id`. 3.099 IDs, 74 cuerpos vacíos, 74 sin `request_action`.
+- `events.jsonl`: 13,661 rows, one per revision used, ordered by `time` with a tie-break by `rev_id` (the tie-break is technical; it does not claim real order within the same second). Columns: `rev_id`, `source_ref` (source file:line), `agent_id` (the literal `label`, names not merged), `time`, `time_grade`, `uncertainty_seconds`, `page_key`, `seq`, `body` (full body; `""` is an emptied page, not missing data), `request_action` (`null` when the original lacks it), `operation` (always `wiki.edit`, a declared adaptation), and `provenance` (what is observed, adapted, or unknown in that row).
+- `cleaning.json`: input 14,591 = 31 humans (`is_human_handle` in `labels`) + 899 without a name + 13,661 used. Recovered 0: no nameless row has a `related_event_id`. 3,099 IDs, 74 empty bodies, 74 without `request_action`.
 
-Dos ejecuciones sobre los mismos originales producen ficheros idénticos byte a byte. El dataset se carga solo:
+Two runs over the same originals produce byte-identical files. The dataset loads on its own:
 
 ```python
 import pandas as pd
 df = pd.read_json("data/prepared/wiki/events.jsonl", lines=True)
 ```
 
-No contiene decisiones, política ni guiones propios; el ID de reproducción lo asignará el ejecutor en fases posteriores.
+It contains no decisions, policy, or scripts of ours; the replay ID will be assigned by the executor in later phases.
 
-## Límites declarados
+## Scenario, policy, and gatekeeper
 
-De ExploitGym no tomamos nada para el código: ni instancias, ni encargos, ni herramientas, ni pruebas. Solo aporta contexto documental sobre el control existente para la matriz control × fase.
+Everything in `scenario/` is **our own material**: a round-based research task ([task.md](scenario/task.md)) reconstructed from what the agents say in the corpus, three local wiki pages with invented data, three questions with a reference answer, and five scripts. It is not the task any real agent received.
 
-La reproducción de la wiki muestra decisiones retrospectivas sobre acciones observadas. La prueba del ejecutor demuestra el veto en un entorno controlado. Ninguna de las dos permite afirmar que se habría evitado el incidente completo. Que los agentes de la wiki llegaran por el hueco de provider-side es una hipótesis consistente con la evidencia, no un mecanismo demostrado: el corpus no contiene ninguna llamada a herramienta.
+[policy.yaml](scenario/policy.yaml) is the only policy: the five calls the task authorizes (`web.search`, `page.read`, `round.question`, `answer.submit`, `clock.wait`), each with the section of `task.md` it comes from, and `default: deny`. Editing the wiki is not in the list and that is why it is blocked; no rule names it. The memory rule (`clock-budget`: the task seconds requested with `clock.wait` cannot exceed the wall seconds elapsed) is declared with `scope: agent_history` and is enforced in phase 4; requesting it now raises an error instead of being ignored.
 
-La wiki entera es comportamiento del incidente, así que por sí sola no permite contar bloqueos erróneos de trabajo legítimo. Lo comprobamos con casos propios y límites declarados, sin depender de un corpus externo ni atribuirles una tasa general de acierto.
+```sh
+uv run python -m bouncer.executor --script scenario/scripts/legitimate.jsonl --run-id demo-legit --output-dir /tmp/bouncer/legit
+uv run python -m bouncer.executor --script scenario/scripts/forbidden_edit.jsonl --run-id demo-edit --output-dir /tmp/bouncer/edit
+uv run pytest -q
+```
 
-## Documentación
+The executor copies `scenario/wiki/` to `<output-dir>/workdir/`, the only directory the tools see, and writes `<output-dir>/decisions.jsonl` outside it. If `workdir/` already exists from a previous run it is replaced; if it contains files that do not come from the scenario, the executor refuses. Each log line carries `run_id`, `agent_id`, `call_id`, `tool`, `operation`, `decision`, `rule`, `reason`, `policy_version`, `clock_mode`, `cooldown_seconds`, `status` (`ok` | `blocked` | `error` | `rejected`), and `duration_ms`; `result_ref` points to the result without copying bodies (`round:none` when `round.question` had no new round). Identity is assigned by the executor from the script; arguments carrying `agent_id` or `policy` do not change it. A line without an agent, or without well-formed `call.tool`, `call.operation`, and `call.args`, is logged as `rejected` and not executed.
 
-- [PRD: alcance, requisitos y criterios de aceptación](PRD.md).
-- [Diseño del proyecto: partes 1 y 2, esquema, datos y evaluación](docs/proyecto-portero-tool-calls.md).
-- [Hallazgos sobre ExploitGym y su harness](docs/hallazgos-exploitgym.md), con fuentes y aviso de versión.
-- [Contexto y requisitos del sprint](docs/ai-incident-response-sprint.md).
-- [Datos de la wiki](data/collusion-wiki/) y [agregados y muestras de Hugging Face](docs/datos-replay-hf.json).
-- [Tareas pendientes](docs/tareas-pendientes.md).
-- [Instrucciones para trabajar en el repositorio](AGENTS.md).
+Verified results on the scripts: the legitimate one ends with 12 `ok` calls; the forbidden-edit one blocks `wiki.edit` by `default-deny` with the working copy byte-identical to the original. `clock.wait` runs by default in `harness_bug` mode (advances the task clock instantly, a labeled reproduction of the documented bug); `--clock honest` really sleeps. The fixed wait between rounds is `--cooldown`, 2111 s by default (35m11, a value observed in the corpus).
 
-Para los conteos y supuestos del corpus, prevalece la revisión documentada en el diseño del proyecto sobre los resúmenes históricos del README de datos.
+## Declared limits
+
+We take nothing from ExploitGym for the code: no instances, no tasks, no tools, no tests. It only provides documentary context on the existing control for the control × phase matrix.
+
+The wiki replay shows retrospective decisions on observed actions. The executor test demonstrates the veto in a controlled environment. Neither allows claiming that the full incident would have been prevented. That the wiki agents came in through the provider-side gap is a hypothesis consistent with the evidence, not a demonstrated mechanism: the corpus contains no tool call.
+
+The whole wiki is incident behavior, so on its own it does not allow counting wrongful blocks of legitimate work. We check that with our own cases and declared limits, without depending on an external corpus or attributing a general accuracy rate to them.
+
+## Documentation
+
+- [PRD: scope, requirements, and acceptance criteria](PRD.md).
+- [Project design: parts 1 and 2, schema, data, and evaluation](docs/proyecto-portero-tool-calls.md).
+- [Findings on ExploitGym and its harness](docs/hallazgos-exploitgym.md), with sources and version caveat.
+- [Sprint context and requirements](docs/ai-incident-response-sprint.md).
+- [Wiki data](data/collusion-wiki/) and [Hugging Face aggregates and samples](docs/datos-replay-hf.json).
+- [Pending tasks](docs/tareas-pendientes.md).
+- [Instructions for working in the repository](AGENTS.md).
+
+For corpus counts and assumptions, the documented review in the project design prevails over the historical summaries in the data README.
